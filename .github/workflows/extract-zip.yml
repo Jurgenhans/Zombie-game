@@ -1,0 +1,49 @@
+
+name: Projekt3D ZIP entpacken
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: ZIP entpacken
+        run: |
+          if [ ! -f projekt3d.zip ]; then
+            echo "projekt3d.zip wurde nicht gefunden!"
+            exit 1
+          fi
+
+          mkdir -p extracted
+
+          unzip -o projekt3d.zip -d extracted
+
+          # Dateien ins Repository übernehmen
+          cp -a extracted/. .
+
+          rm -rf extracted
+
+          echo "ZIP erfolgreich entpackt!"
+
+      - name: Änderungen committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git reset -- projekt3d.zip
+
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen vorhanden."
+          else
+            git commit -m "Projekt3D ZIP automatisch entpackt"
+            git push
+          fi
