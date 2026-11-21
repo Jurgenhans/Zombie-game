@@ -49,7 +49,8 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Die Schlag-Animation nutzt vorerst "Throw", weil das Paket keine Nahkampf-Animationen enthält.
 
 ## Zombies
-- 10 Zombies stehen im Feld 45 in einem Kreis, genau 50 m um den Startpunkt (Mitte von Feld 45). Zwei selbstgebaute Lowpoly-Modelle: **Schlurfer** (40 LP) und **Brocken** (80 LP), siehe `js/zombies.js`.
+- 10 Zombies stehen als dichter Haufen in Feld 45, dessen Mitte 50 m vom Startpunkt (Mitte von Feld 45) entfernt liegt (geradeaus nach Norden, also in Blickrichtung beim Start). Zwei selbstgebaute Lowpoly-Modelle, 30 % größer als das Grundmodell (`ZOMBIE_SCALE` in `js/zombies.js`): **Schlurfer** und **Brocken**.
+- Jeder Zombie hält **2 Treffer** aus, egal mit welcher Waffe (`HITS_TO_KILL` in `js/enemies.js`).
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
-- Anzahl, Abstand und Aggro-Reichweite: `spawnHorde(...)` in `js/game.js`, Konstanten oben in `js/enemies.js`.
+- Anzahl, Abstand und Richtung des Haufens: `spawnHorde(...)` in `js/game.js`.

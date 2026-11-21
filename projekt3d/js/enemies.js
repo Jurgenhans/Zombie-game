@@ -2,11 +2,12 @@
 
 import * as THREE from 'three';
 import { MAP_SIZE } from './config.js';
-import { createZombieModel, ZOMBIE_TYPES } from './zombies.js';
+import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE } from './zombies.js';
 
 const AGGRO = 18;      // ab dieser Entfernung (m) bemerken sie den Spieler
 const LOSE = 35;       // ab dieser Entfernung geben sie auf
-const REACH = 1.5;     // so nah gehen sie heran
+const REACH = 1.5 * ZOMBIE_SCALE;     // so nah gehen sie heran
+const HITS_TO_KILL = 2;   // Treffer, die ein Zombie aushält (egal mit welcher Waffe)
 const RESPAWN = 20;    // Sekunden, bis ein besiegter Zombie wieder aufsteht (zum Testen)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const ease = (t) => t * t * (3 - 2 * t);
@@ -24,6 +25,7 @@ function blobShadow() {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
   m.position.y = 0.03;
+  m.scale.setScalar(ZOMBIE_SCALE);
   return m;
 }
 
@@ -34,13 +36,16 @@ export class EnemyManager {
     this.shots = [];
   }
 
-  // count Zombies im Kreis (Radius m) um den Startpunkt, abwechselnd Schlurfer / Brocken
-  spawnHorde(center, count = 10, radius = 50) {
+  // count Zombies als dichter Haufen, dessen Mitte `radius` m vom Startpunkt entfernt liegt
+  // (dir = Richtung in rad; -PI/2 = nach Norden, also geradeaus vom Startpunkt aus gesehen).
+  // Abwechselnd Schlurfer / Brocken.
+  spawnHorde(center, count = 10, radius = 50, dir = -Math.PI / 2) {
     this.clear();
+    const cx = center.x + Math.cos(dir) * radius, cz = center.z + Math.sin(dir) * radius;
     const kinds = ['walker', 'brute'];
     for (let i = 0; i < count; i++) {
-      const ang = (i / count) * Math.PI * 2 + 0.3;
-      this._add(kinds[i % 2], center.x + Math.cos(ang) * radius, center.z + Math.sin(ang) * radius, Math.random() * Math.PI * 2);
+      const a = i * 2.39996, r = 1.35 * Math.sqrt(i);                    // Sonnenblumen-Muster: dicht, ohne Überlappung
+      this._add(kinds[i % 2], cx + Math.cos(a) * r, cz + Math.sin(a) * r, Math.random() * Math.PI * 2);
     }
   }
 
@@ -66,7 +71,7 @@ export class EnemyManager {
     bg.scale.set(1, 0.13, 1);
 
     const e = { kind, type, holder, model, rig: model.rig, mats: model.mats, bg, fill,
-      x, z, yaw, bx: x, bz: z, byaw: yaw, hp: type.hp, state: 'idle', phase: Math.random() * 6, flash: 0, deathT: 0, atkT: 0 };
+      x, z, yaw, bx: x, bz: z, byaw: yaw, hp: HITS_TO_KILL, state: 'idle', phase: Math.random() * 6, flash: 0, deathT: 0, atkT: 0 };
     this.scene.add(holder);
     this.list.push(e);
     this._place(e);
@@ -75,7 +80,7 @@ export class EnemyManager {
   _place(e) { e.holder.position.set(e.x, e.holder.position.y, e.z); e.holder.rotation.y = e.yaw; }
 
   _reset(e) {
-    e.x = e.bx; e.z = e.bz; e.yaw = e.byaw; e.hp = e.type.hp; e.state = 'idle'; e.deathT = 0; e.flash = 0;
+    e.x = e.bx; e.z = e.bz; e.yaw = e.byaw; e.hp = HITS_TO_KILL; e.state = 'idle'; e.deathT = 0; e.flash = 0;
     e.model.group.rotation.x = 0; e.holder.position.y = 0;
     e.bg.visible = e.fill.visible = false;
     this._place(e);
@@ -84,7 +89,7 @@ export class EnemyManager {
   // ---- Treffer ------------------------------------------------------------------
   hit(e, dmg, fromX, fromZ) {
     if (e.state === 'dead') return;
-    e.hp -= dmg;
+    e.hp -= 1;                                                          // jeder Treffer zählt gleich (HITS_TO_KILL)
     e.flash = 0.15;
     const dx = e.x - fromX, dz = e.z - fromZ, d = Math.hypot(dx, dz) || 1;
     e.x += (dx / d) * 0.35; e.z += (dz / d) * 0.35;                    // kleiner Rückstoß
@@ -94,7 +99,7 @@ export class EnemyManager {
       return;
     }
     if (e.state === 'idle' || e.state === 'return') e.state = 'chase';
-    const r = e.hp / e.type.hp;
+    const r = e.hp / HITS_TO_KILL;
     e.bg.visible = e.fill.visible = true;
     e.fill.scale.set(0.94 * r, 0.09, 1);
     e.fill.center.set(0.47 / (0.94 * r), 0.5);                         // linksbündig
@@ -152,7 +157,7 @@ export class EnemyManager {
     for (let i = 0; i < this.list.length; i++) for (let j = i + 1; j < this.list.length; j++) {
       const a = this.list[i], b = this.list[j];
       if (a.state === 'dead' || b.state === 'dead') continue;
-      const vx = b.x - a.x, vz = b.z - a.z, d = Math.hypot(vx, vz), min = 0.9;
+      const vx = b.x - a.x, vz = b.z - a.z, d = Math.hypot(vx, vz), min = 0.9 * ZOMBIE_SCALE;
       if (d > 0 && d < min) { const k = (min - d) / 2 / d; a.x -= vx * k; a.z -= vz * k; b.x += vx * k; b.z += vz * k; }
     }
     for (const e of this.list) { e.x = Math.min(MAP_SIZE - 1, Math.max(1, e.x)); e.z = Math.min(MAP_SIZE - 1, Math.max(1, e.z)); this._place(e); }

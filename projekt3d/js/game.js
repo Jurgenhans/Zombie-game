@@ -88,7 +88,7 @@ export class Game {
     this.pending = null;
     this.applyEquipment();
     this.player = { x, z, yaw };
-    this.enemies.spawnHorde(this.startPoint ?? { x, z }, 10, 50);   // 10 Zombies, 50 m vom Startpunkt
+    this.enemies.spawnHorde(this.startPoint ?? { x, z }, 10, 50);   // 10 Zombies als Haufen, 50 m vom Startpunkt
     this.cam.yaw = yaw + Math.PI;   // Kamera hinter die Figur
     this.mode = 'play';
     this.paused = false;
