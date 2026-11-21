@@ -1,0 +1,86 @@
+
+name: Projekt3D APK bauen
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'game.js'
+      - 'style.css'
+      - 'assets/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository herunterladen
+        uses: actions/checkout@v4
+
+      - name: Java installieren
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Node installieren
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: HTML-Spiel finden
+        run: |
+          if [ ! -f index.html ]; then
+            echo "Suche index.html..."
+
+            INDEX=$(find . -not -path './.git/*' \
+              -not -path './node_modules/*' \
+              -name index.html -print -quit)
+
+            if [ -z "$INDEX" ]; then
+              echo "Keine index.html gefunden!"
+              exit 1
+            fi
+
+            GAME_DIR=$(dirname "$INDEX")
+          else
+            GAME_DIR="."
+          fi
+
+          mkdir -p www
+          cp -a "$GAME_DIR"/. www/
+
+      - name: Capacitor einrichten
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.projekt3d.game",
+            "appName": "Projekt3D",
+            "webDir": "www"
+          }
+          EOF
+
+          npx cap add android
+          npx cap sync android
+
+      - name: Android APK bauen
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: APK hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Projekt3D-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
