@@ -1,7 +1,7 @@
 // Die Spielwelt: Boden, Himmel, Spielerfigur, Kamera, Steuerung.
 
 import * as THREE from 'three';
-import { MAP_SIZE, FIELD_SIZE, WALK_SPEED, RUN_SPEED, BIOME_NAMES } from './config.js';
+import { MAP_SIZE, FIELD_SIZE, WALK_SPEED, RUN_SPEED, BIOME_NAMES, TOUCH } from './config.js';
 import { createTerrain, createSky, SKY_HORIZON, FOG_NEAR, FOG_FAR } from './terrain.js';
 import { fieldAtWorld, fieldCenter, fieldRowCol, fieldNumber } from './mapgen.js';
 import { createActor } from './characters.js';
@@ -59,6 +59,7 @@ export class Game {
     this.activeField = -1;
     this.cam = { yaw: 0, pitch: 0.35, dist: 6.5 };
     this.keys = new Set();
+    this.touchMove = { x: 0, y: 0 };   // Joystick: x = rechts, y = vorwärts (-1..1)
     this.backdropT = 0;
     this.moving = false;
     this.backdropCenter = { x: MAP_SIZE / 2, z: MAP_SIZE / 2 };
@@ -90,6 +91,7 @@ export class Game {
     if (this.actor) { this.scene.remove(this.actor.group); this.actor = null; }
     this.shadow.visible = false;
     this.keys.clear();
+    this.touchMove.x = this.touchMove.y = 0;
   }
 
   setActiveField(idx) {
@@ -120,6 +122,18 @@ export class Game {
     this.camera.updateProjectionMatrix();
   }
 
+  // ---- Touch-Eingaben (kommen aus touch.js) -----------------------------------------
+  setTouchMove(x, y) { this.touchMove.x = x; this.touchMove.y = y; }
+  touchLook(dx, dy) {
+    if (this.mode !== 'play' || this.paused) return;
+    this.cam.yaw -= dx * TOUCH.LOOK_X;
+    this.cam.pitch = Math.min(1.35, Math.max(-0.1, this.cam.pitch + dy * TOUCH.LOOK_Y));
+  }
+  touchZoom(factor) {
+    if (this.mode !== 'play' || this.paused) return;
+    this.cam.dist = Math.min(16, Math.max(2.5, this.cam.dist * factor));
+  }
+
   // ---- Eingabe ---------------------------------------------------------------------
   _bindInput() {
     const el = this.renderer.domElement;
@@ -133,11 +147,13 @@ export class Game {
     window.addEventListener('blur', () => this.keys.clear());
     el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return;   // Touch macht touch.js
       if (this.mode !== 'play') return;
       dragging = true; el.setPointerCapture?.(e.pointerId);
     });
     el.addEventListener('pointerup', (e) => { dragging = false; el.releasePointerCapture?.(e.pointerId); });
     el.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
       if (!dragging || this.mode !== 'play' || this.paused) return;
       this.cam.yaw -= e.movementX * 0.005;
       this.cam.pitch = Math.min(1.35, Math.max(-0.1, this.cam.pitch + e.movementY * 0.004));
@@ -165,14 +181,22 @@ export class Game {
 
   _updatePlay(dt) {
     const k = this.keys;
-    let ix = 0, iz = 0;
+    let ix = 0, iz = 0, mag = 1, joy = false;
     if (!this.paused) {
       if (k.has('KeyW') || k.has('ArrowUp')) iz += 1;
       if (k.has('KeyS') || k.has('ArrowDown')) iz -= 1;
       if (k.has('KeyD') || k.has('ArrowRight')) ix += 1;
       if (k.has('KeyA') || k.has('ArrowLeft')) ix -= 1;
+      if (ix === 0 && iz === 0) {   // Touch-Joystick (analog)
+        const tl = Math.hypot(this.touchMove.x, this.touchMove.y);
+        if (tl > TOUCH.DEADZONE) {
+          ix = this.touchMove.x / tl; iz = this.touchMove.y / tl;
+          mag = Math.min(1, (tl - TOUCH.DEADZONE) / (1 - TOUCH.DEADZONE));
+          joy = true;
+        }
+      }
     }
-    const run = k.has('ShiftLeft') || k.has('ShiftRight');
+    const run = k.has('ShiftLeft') || k.has('ShiftRight') || (joy && mag >= TOUCH.RUN_AT);
     const len = Math.hypot(ix, iz);
     this.moving = len > 0;
 
@@ -182,7 +206,7 @@ export class Game {
       // Kamerarichtung nach vorn = (-s, -c), rechts = (c, -s)
       const dx = -s * iz + c * ix;
       const dz = -c * iz - s * ix;
-      const speed = run ? RUN_SPEED : WALK_SPEED;
+      const speed = run ? RUN_SPEED : WALK_SPEED * (joy ? Math.max(0.35, mag / TOUCH.RUN_AT) : 1);
       this.player.x = Math.min(MAP_SIZE - EDGE, Math.max(EDGE, this.player.x + dx * speed * dt));
       this.player.z = Math.min(MAP_SIZE - EDGE, Math.max(EDGE, this.player.z + dz * speed * dt));
       // Figur dreht sich weich in Laufrichtung (Modelle blicken nach +Z)

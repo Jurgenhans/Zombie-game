@@ -33,3 +33,10 @@ Feld = Reihe * 10 + Spalte + 1. Beispiel: Feld 37 = Reihe 4, Spalte 7, Mitte x 1
 
 Der Map-Seed (`MAP_SEED` in config.js) ist fest, die Karte sieht immer gleich aus.
 Modelle: Kay Lousberg, CC0 (assets/LICENSE_KayKit.txt).
+
+## Android / Touch
+Auf Touch-Geräten (oder am PC mit `?touch=1` hinter der Adresse) erscheint automatisch die Handy-Oberfläche:
+links Joystick (erscheint unter dem Daumen, Vollausschlag = Rennen) · rechts Wischen = Kamera, zwei Finger = Zoom ·
+unten Mitte 5 Slots (Tränke/Booster) · rechts 5 Slots (Fertigkeiten) · oben rechts Menü ☰ und Gitter ▦ · Karte per Tipp auf die Minimap.
+Die Slots sind nur Oberfläche; beim Antippen sendet `touch.js` das Ereignis `slotuse` ({bar, index}), daran lässt sich später die Funktion hängen.
+Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/config.js`. "Vollbild" gibt es im Hauptmenü und im Pausenmenü.

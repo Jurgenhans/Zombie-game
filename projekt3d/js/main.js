@@ -11,6 +11,7 @@ import { Game } from './game.js';
 import { CharacterSelect } from './select.js';
 import { MapView } from './minimap.js';
 import { loadSave, writeSave } from './save.js';
+import { TouchControls, initSlots, isTouchDevice } from './touch.js';
 
 window.__started = true;
 const $ = (id) => document.getElementById(id);
@@ -59,6 +60,11 @@ const game = new Game(renderer, biomes, splat);
   const cz = snow.reduce((a, i) => a + fieldCenter(i).z, 0) / snow.length;
   game.setBackdropCenter(cx, cz);
 }
+
+// Android / Touch: Joystick, Kamera-Wischen, Slot-Leisten
+const touchMode = isTouchDevice();
+document.body.classList.toggle('touch', touchMode);
+if (touchMode) { new TouchControls(game, canvas); initSlots(); }
 
 let select = null;
 let state = 'loading'; // loading | menu | select | game
@@ -153,7 +159,11 @@ let miniTimer = 0, autosaveTimer = 0, hudTimer = 0;
 let bigOpen = false, hoverField = -1, selectedField = -1;
 
 function fitMaps() {
-  MapView.fit(mini, Math.round(Math.min(230, Math.max(150, window.innerWidth * 0.22))));
+  const miniSize = touchMode
+    ? Math.round(Math.min(130, Math.max(90, window.innerHeight * 0.26)))
+    : Math.round(Math.min(230, Math.max(150, window.innerWidth * 0.22)));
+  document.documentElement.style.setProperty('--mini', miniSize + 'px');
+  MapView.fit(mini, miniSize);
   const bigSize = Math.floor(Math.min(window.innerHeight * 0.78, window.innerWidth * 0.9, 820));
   MapView.fit(big, Math.max(260, bigSize));
   drawMaps();
@@ -232,6 +242,21 @@ function closePause() { paused = game.paused = false; showOnly(); }
 $('btnResume').onclick = closePause;
 $('btnSave').onclick = () => saveNow(true);
 $('btnToMenu').onclick = toMainMenu;
+$('btnPauseTouch').onclick = () => { if (state === 'game' && !paused) openPause(); };
+$('btnGridTouch').onclick = () => {
+  if (state !== 'game' || paused) return;
+  game.toggleGrid();
+  toast(game.terrain.gridOn ? 'Feldgitter an' : 'Feldgitter aus');
+};
+// Vollbild (Android): blendet die Browserleiste aus und sperrt das Querformat
+document.querySelectorAll('.js-fs').forEach((b) => {
+  b.onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else { await document.documentElement.requestFullscreen(); await screen.orientation?.lock?.('landscape'); }
+    } catch (e) { /* nicht unterstützt */ }
+  };
+});
 
 // Tastatur
 window.addEventListener('keydown', (e) => {

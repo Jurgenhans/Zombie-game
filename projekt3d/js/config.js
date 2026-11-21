@@ -35,3 +35,12 @@ export const CHARACTERS = [
 // Spielergeschwindigkeit (Meter pro Sekunde)
 export const WALK_SPEED = 5;
 export const RUN_SPEED = 14;
+
+// Touch-Steuerung (Android)
+export const TOUCH = {
+  JOY_ZONE: 0.45,   // linke 45 % des Bildschirms: Joystick, der Rest: Kamera
+  DEADZONE: 0.12,   // Joystick-Totzone (0..1)
+  RUN_AT: 0.85,     // ab so viel Ausschlag wird gerannt, darunter gegangen
+  LOOK_X: 0.006,    // Kamera-Empfindlichkeit waagerecht
+  LOOK_Y: 0.005,    // Kamera-Empfindlichkeit senkrecht
+};

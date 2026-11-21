@@ -149,3 +149,55 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e0c09; col
   .arrow { width: 44px; height: 64px; font-size: 2.2rem; }
   .menu-panel { padding: 1.6rem 1.4rem; }
 }
+
+/* ---------- Touch / Android ---------- */
+.touch-ui, .touch-only { display: none; }
+body.touch .touch-only { display: block; }
+body.touch #hud .touch-ui { display: block; }
+html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body.touch { touch-action: none; }
+.bigmap-panel { touch-action: pan-x pan-y; }
+
+body.touch #hudHelp, body.touch .mini-label { display: none; }
+body.touch { --slot: clamp(40px, 12vh, 58px); }
+
+/* Minimap oben links, Feldinfo daneben, Menü-Buttons oben rechts */
+body.touch #miniWrap { left: calc(14px + env(safe-area-inset-left)); right: auto; top: 14px; bottom: auto; }
+body.touch #hudInfo { left: calc(var(--mini, 100px) + 28px + env(safe-area-inset-left)); top: 14px; padding: 0.35rem 0.7rem; }
+body.touch .hud-field { font-size: 1.05rem; }
+body.touch #hudToast, body.touch .toast { top: 70px; }
+
+#touchBtns { position: absolute; top: 14px; right: calc(14px + env(safe-area-inset-right)); display: none; gap: 8px; }
+body.touch #hud #touchBtns { display: flex; }
+.tbtn {
+  width: 44px; height: 44px; font-size: 1.3rem; line-height: 1; color: var(--gold);
+  background: rgba(18, 14, 9, 0.72); border: 1px solid rgba(255, 200, 60, 0.35); border-radius: 10px;
+}
+.tbtn:active { background: rgba(255, 200, 60, 0.25); }
+
+/* Joystick (nur Anzeige, fängt keine Berührungen ab) */
+#joyBase {
+  --r: 56px; position: absolute; width: calc(var(--r) * 2); height: calc(var(--r) * 2); border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07); border: 2px solid rgba(255, 200, 60, 0.4);
+  opacity: 0.5; pointer-events: none !important; transition: opacity .12s;
+}
+#joyBase.active { opacity: 0.95; }
+#joyKnob {
+  position: absolute; left: 50%; top: 50%; width: calc(var(--r) * 0.8); height: calc(var(--r) * 0.8);
+  margin: calc(var(--r) * -0.4) 0 0 calc(var(--r) * -0.4); border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, #c78e14); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Slot-Leisten */
+.slotbar { position: absolute; display: none; gap: 6px; pointer-events: none !important; }
+body.touch #hud .slotbar { display: flex; }
+#potionBar { left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom)); flex-direction: row; }
+#skillBar { right: calc(14px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); flex-direction: column; }
+.slot {
+  pointer-events: auto; position: relative; width: var(--slot); height: var(--slot); padding: 0;
+  background: rgba(18, 14, 9, 0.62); border: 2px solid rgba(255, 200, 60, 0.45); border-radius: 12px;
+  color: var(--dim); font: 700 0.7rem var(--sans); touch-action: none;
+}
+.slot span { position: absolute; left: 6px; top: 3px; opacity: 0.7; }
+#skillBar .slot { border-color: rgba(120, 190, 255, 0.5); }
+.slot.press { background: rgba(255, 200, 60, 0.3); transform: scale(0.94); }
