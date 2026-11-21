@@ -243,3 +243,6 @@ body.touch #btnAttack:active { transform: scale(0.93); }
 .ii-sub { color: var(--text); font-size: 0.85rem; margin-top: 0.1rem; }
 .ii-sub.warn { color: var(--danger); }
 .inv-info .btn { margin: 0; flex: none; }
+
+.ico svg { width: 1em; height: 1em; display: block; }
+#btnAttack svg { width: 1em; height: 1em; margin: auto; stroke: #fff; }

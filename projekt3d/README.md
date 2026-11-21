@@ -45,5 +45,11 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - **Inventar** (🎒-Knopf oben rechts oder Taste **I**): rechts der Rucksack (10 x 6 Felder, einstellbar mit `INV_COLS`/`INV_ROWS` in `config.js`), links die Ausrüstung: Helm, Waffe, Rüstung, Handschuhe, Schuhe, 2 x Implantat.
   Bedienung: Gegenstand antippen = auswählen, dann leeres/anderes Feld = verschieben/tauschen, Ausrüstungsfeld oder Knopf "Ausrüsten"/"Ablegen" = anlegen/ablegen.
 - **Zuschlagen** (roter Knopf oder Taste **F**): mit Waffe wird sie benutzt, sonst Faustschlag. Beim Schlag wird das Ereignis `playerattack` ({weapon, damage}) gesendet.
-- Neue Gegenstände: `js/items.js` (Daten), Waffenmodelle in `js/weapons.js`. Das Inventar steht im Spielstand (`js/inventory.js`).
+- Testwaffen im Rucksack: Schwert, Axt, Bogen (linke Hand), Magierstab, Armbrust. Neue Gegenstände: `js/items.js` (Daten), Waffenmodelle und Schlag-Haltung in `js/weapons.js`. Das Inventar steht im Spielstand (`js/inventory.js`).
 - Die Schlag-Animation nutzt vorerst "Throw", weil das Paket keine Nahkampf-Animationen enthält.
+
+## Zombies
+- 10 Zombies stehen im Feld 45 in einem Kreis, genau 50 m um den Startpunkt (Mitte von Feld 45). Zwei selbstgebaute Lowpoly-Modelle: **Schlurfer** (40 LP) und **Brocken** (80 LP), siehe `js/zombies.js`.
+- Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
+- Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
+- Anzahl, Abstand und Aggro-Reichweite: `spawnHorde(...)` in `js/game.js`, Konstanten oben in `js/enemies.js`.

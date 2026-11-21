@@ -6,6 +6,7 @@ import { createTerrain, createSky, SKY_HORIZON, FOG_NEAR, FOG_FAR } from './terr
 import { fieldAtWorld, fieldCenter, fieldRowCol, fieldNumber } from './mapgen.js';
 import { createActor } from './characters.js';
 import { ITEMS } from './items.js';
+import { EnemyManager } from './enemies.js';
 
 const EDGE = 1.5; // Abstand zum Kartenrand
 
@@ -60,6 +61,9 @@ export class Game {
     this.activeField = -1;
     this.cam = { yaw: 0, pitch: 0.35, dist: 6.5 };
     this.keys = new Set();
+    this.enemies = new EnemyManager(this.scene);
+    this.startPoint = null;             // Startpunkt der Welt (von main.js gesetzt)
+    this.pending = null;                // Treffer, der in der Mitte des Schlags ausgelöst wird
     this.inventory = null;              // wird von main.js gesetzt
     this.attackT = -1; this.attackDur = 0;
     this.touchMove = { x: 0, y: 0 };   // Joystick: x = rechts, y = vorwärts (-1..1)
@@ -81,8 +85,10 @@ export class Game {
     this.scene.add(this.actor.group);
     this.actor.play('Idle_A');
     this.attackT = -1;
+    this.pending = null;
     this.applyEquipment();
     this.player = { x, z, yaw };
+    this.enemies.spawnHorde(this.startPoint ?? { x, z }, 10, 50);   // 10 Zombies, 50 m vom Startpunkt
     this.cam.yaw = yaw + Math.PI;   // Kamera hinter die Figur
     this.mode = 'play';
     this.paused = false;
@@ -98,6 +104,8 @@ export class Game {
     this.keys.clear();
     this.touchMove.x = this.touchMove.y = 0;
     this.attackT = -1;
+    this.pending = null;
+    this.enemies.clear();
   }
 
   // Ausrüstung am Charakter anzeigen (Waffe in der Hand)
@@ -105,13 +113,25 @@ export class Game {
     this.actor?.setWeapon(this.inventory?.equip.weapon ?? null);
   }
 
+  // Der eigentliche Treffer bzw. Schuss
+  _release(w) {
+    const { x, z, yaw } = this.player, dx = Math.sin(yaw), dz = Math.cos(yaw);
+    if (!w || w.kind === 'melee') this.enemies.meleeHit({ x, z, dx, dz, range: w?.range ?? 1.8, damage: w?.damage ?? 2 });
+    else this.enemies.shoot({ x: x + dx * 0.7, y: 1.35, z: z + dz * 0.7, dx, dz, speed: w.speed, damage: w.damage, kind: w.projectile });
+  }
+
   // Zuschlagen bzw. Waffe benutzen
   attack() {
     if (this.mode !== 'play' || this.paused || !this.actor || this.attackT >= 0) return false;
     const w = ITEMS[this.inventory?.equip.weapon] ?? null;
-    this.attackDur = this.actor.playOnce('Throw', { speed: w ? 1.7 : 2.3 });
+    this.attackDur = this.actor.playOnce('Throw', { speed: w ? (w.attackSpeed ?? 1.7) : 2.3 });
     this.attackT = 0;
-    // Hier kann später Schaden an Gegnern berechnet werden
+    // Zielhilfe: zum nächsten Zombie im Blickfeld der Kamera drehen, sonst in Kamerarichtung
+    const cx = -Math.sin(this.cam.yaw), cz = -Math.cos(this.cam.yaw);
+    const reach = w && w.kind !== 'melee' ? 35 : (w?.range ?? 1.8) + 3;
+    const tgt = this.enemies.nearestInCone(this.player.x, this.player.z, cx, cz, reach, 0.5);
+    this.player.yaw = tgt ? Math.atan2(tgt.x - this.player.x, tgt.z - this.player.z) : Math.atan2(cx, cz);
+    this.pending = { at: this.attackDur * 0.55, w };   // Treffer in der Mitte des Schwungs
     window.dispatchEvent(new CustomEvent('playerattack', { detail: { weapon: w?.id ?? null, damage: w?.damage ?? 2 } }));
     return true;
   }
@@ -221,7 +241,11 @@ export class Game {
         }
       }
     }
-    if (this.attackT >= 0) { this.attackT += dt; if (this.attackT >= this.attackDur) this.attackT = -1; }
+    if (this.attackT >= 0) {
+      this.attackT += dt;
+      if (this.pending && this.attackT >= this.pending.at) { this._release(this.pending.w); this.pending = null; }
+      if (this.attackT >= this.attackDur) this.attackT = -1;
+    }
     const attacking = this.attackT >= 0;
     const run = k.has('ShiftLeft') || k.has('ShiftRight') || (joy && mag >= TOUCH.RUN_AT);
     const len = Math.hypot(ix, iz);
@@ -240,13 +264,14 @@ export class Game {
       const target = Math.atan2(dx, dz);
       let diff = target - this.player.yaw;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-      this.player.yaw += diff * (1 - Math.exp(-dt * 14));
+      if (!attacking) this.player.yaw += diff * (1 - Math.exp(-dt * 14));
       if (!attacking) this.actor.play(run ? 'Running_A' : 'Walking_B', { speed: 1 });
     } else if (!attacking) {
       this.actor.play('Idle_A');
     }
 
     this.actor.update(dt, attacking ? this.attackT / this.attackDur : -1);
+    if (!this.paused) this.enemies.update(dt, this.player);
     this._syncActor();
   }
 

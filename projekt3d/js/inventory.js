@@ -1,7 +1,9 @@
 // Inventar-Daten: Rucksack (INV_COLS x INV_ROWS Felder) + Ausrüstung. Speichert nur Item-IDs.
 
 import { INV_COLS, INV_ROWS } from './config.js';
-import { ITEMS, SLOTS, SLOT_KEYS } from './items.js';
+import { ITEMS, SLOTS, SLOT_KEYS, STARTER_ITEMS } from './items.js';
+
+const VERSION = 2;   // 2: Testwaffen hinzugefügt
 
 export const INV_SIZE = INV_COLS * INV_ROWS;
 
@@ -12,7 +14,7 @@ export class Inventory {
   reset() {
     this.bag = Array(INV_SIZE).fill(null);
     this.equip = Object.fromEntries(SLOT_KEYS.map((k) => [k, null]));
-    this.bag[0] = 'sword_test';
+    STARTER_ITEMS.forEach((id, i) => { this.bag[i] = id; });
   }
 
   load(data) {
@@ -21,9 +23,17 @@ export class Inventory {
     this.bag.fill(null);
     if (Array.isArray(data.bag)) data.bag.slice(0, INV_SIZE).forEach((id, i) => { if (ITEMS[id]) this.bag[i] = id; });
     for (const k of SLOT_KEYS) { const id = data.equip?.[k]; if (ITEMS[id] && this.fits(id, k)) this.equip[k] = id; }
+    // Ältere Spielstände: neue Testwaffen nachliefern
+    if ((data.v ?? 1) < VERSION) {
+      for (const id of STARTER_ITEMS) {
+        if (this.bag.includes(id) || Object.values(this.equip).includes(id)) continue;
+        const free = this.bag.indexOf(null);
+        if (free >= 0) this.bag[free] = id;
+      }
+    }
   }
 
-  toJSON() { return { bag: [...this.bag], equip: { ...this.equip } }; }
+  toJSON() { return { v: VERSION, bag: [...this.bag], equip: { ...this.equip } }; }
 
   fits(id, slot) { return !!ITEMS[id] && ITEMS[id].type === (SLOTS[slot].type ?? slot); }
 

@@ -13,6 +13,7 @@ import { MapView } from './minimap.js';
 import { loadSave, writeSave } from './save.js';
 import { TouchControls, initSlots, isTouchDevice } from './touch.js';
 import { Inventory } from './inventory.js';
+import { ITEMS } from './items.js';
 import { InventoryUI } from './inventory-ui.js';
 
 window.__started = true;
@@ -54,6 +55,7 @@ $('cntSnow').textContent = `${counts[BIOME.SNOW]} Felder (${BIOME_SHARE.snow} %)
 
 const mapView = new MapView(splat);
 const game = new Game(renderer, biomes, splat);
+game.startPoint = fieldCenter(findSpawnField(biomes));   // Startpunkt = Mitte des Startfelds (Feld 45)
 
 // Menühintergrund kreist um die Schneefelder, dort treffen alle drei Böden aufeinander
 {
@@ -69,7 +71,7 @@ game.inventory = inventory;
 let invOpen = false;
 function refreshEquipment() {
   game.applyEquipment();
-  $('btnAttack').textContent = inventory.equip.weapon ? '🗡️' : '👊';
+  $('btnAttack').innerHTML = inventory.equip.weapon ? ITEMS[inventory.equip.weapon].icon : '👊';
 }
 const invUI = new InventoryUI(inventory, () => { refreshEquipment(); if (state === 'game') saveNow(false); });
 

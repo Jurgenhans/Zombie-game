@@ -92,7 +92,9 @@ export class InventoryUI {
     const id = this.itemAt(sel), it = id && ITEMS[id];
     if (it) {
       this.info.innerHTML = '';
-      const t = document.createElement('div'); t.className = 'ii-title'; t.textContent = `${it.icon} ${it.name}`;
+      const t = document.createElement('div'); t.className = 'ii-title';
+      const ic = document.createElement('span'); ic.className = 'ico'; ic.innerHTML = it.icon;
+      t.append(ic, ` ${it.name}`);
       const d = document.createElement('div'); d.className = 'ii-sub';
       d.textContent = `${TYPE_NAMES[it.type]}${it.damage ? ` · Schaden ${it.damage}` : ''} — ${it.desc}`;
       this.info.append(t, d);

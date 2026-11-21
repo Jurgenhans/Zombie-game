@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CHARACTERS } from './config.js';
-import { createWeaponMesh } from './weapons.js';
+import { createWeaponMesh, WEAPON_STYLE } from './weapons.js';
 
 const loader = new GLTFLoader();
 export const assets = { models: {}, clips: {} };
@@ -75,32 +75,41 @@ export function createActor(characterId) {
     return next.getClip().duration / speed;
   }
 
-  // Waffe in der rechten Hand. Die Ausrichtung der Waffe wird hier selbst berechnet,
-  // sie folgt nur der Handposition (Schwung: swing 0..1, -1 = Ruhehaltung).
-  const hand = root.getObjectByName('handslot.r');
-  let weapon = null, weaponId = null;
+  // Waffe in der Hand. Die Ausrichtung berechnen wir selbst, die Waffe folgt nur der Handposition.
+  // Achtung: der GLTFLoader entfernt Punkte aus Knochennamen ("handslot.r" wird zu "handslotr").
+  const hands = {};
+  root.traverse((o) => {
+    const m = /^handslot[._]?([lr])$/i.exec(o.userData?.name || o.name || '');
+    if (m) hands[m[1].toLowerCase()] = o;
+  });
+  let weapon = null, weaponId = null, style = null;
   const inv = new THREE.Matrix4();
   function setWeapon(id) {
     if (id === weaponId) return;
     if (weapon) group.remove(weapon);
     weapon = id ? createWeaponMesh(id) : null;
+    style = weapon ? WEAPON_STYLE[id] : null;
     weaponId = weapon ? id : null;
     if (weapon) group.add(weapon);
   }
-  const KEYS = [[0, 0.6], [0.3, -1.0], [0.6, 2.2], [1, 0.6]];   // Neigung der Klinge (rad): Ruhe, Ausholen, Schlag, zurück
   const ease = (t) => t * t * (3 - 2 * t);
-  function swingAngle(u) {
-    for (let i = 1; i < KEYS.length; i++) {
-      if (u <= KEYS[i][0]) { const [t0, a0] = KEYS[i - 1], [t1, a1] = KEYS[i]; return a0 + (a1 - a0) * ease((u - t0) / (t1 - t0)); }
+  function swingAngle(keys, u) {
+    for (let i = 1; i < keys.length; i++) {
+      if (u <= keys[i][0]) { const [t0, a0] = keys[i - 1], [t1, a1] = keys[i]; return a0 + (a1 - a0) * ease((u - t0) / (t1 - t0)); }
     }
-    return KEYS[0][1];
+    return keys[0][1];
   }
   function updateWeapon(swing) {
-    if (!weapon || !hand) return;
-    root.updateMatrixWorld(true);
-    inv.copy(group.matrixWorld).invert().multiply(hand.matrixWorld);
-    weapon.position.setFromMatrixPosition(inv);
-    weapon.rotation.set(swing < 0 ? KEYS[0][1] : swingAngle(Math.min(1, swing)), 0, 0);
+    if (!weapon) return;
+    const hand = hands[style.hand];
+    if (hand) {
+      root.updateMatrixWorld(true);
+      inv.copy(group.matrixWorld).invert().multiply(hand.matrixWorld);
+      weapon.position.setFromMatrixPosition(inv);
+    } else {
+      weapon.position.set(style.hand === 'r' ? -0.3 : 0.3, 0.95, 0.15);   // Notlösung, falls der Knochen fehlt
+    }
+    weapon.rotation.set(swing < 0 ? style.keys[0][1] : swingAngle(style.keys, Math.min(1, swing)), 0, 0);
   }
 
   return { group, root, mixer, play, playOnce, setWeapon, update: (dt, swing = -1) => { mixer.update(dt); updateWeapon(swing); } };
