@@ -64,9 +64,15 @@ export class Game {
     this.keys = new Set();
     this.enemies = new EnemyManager(this.scene);
     this.stats = new PlayerStats();     // Level, HP, Kills
+    this.pendingDeath = false;
     this.enemies.onKill = () => {
-      if (this.stats.addKill()) window.dispatchEvent(new CustomEvent('levelup', { detail: { level: this.stats.level, maxHp: this.stats.maxHp } }));
+      const points = this.stats.pointsEarned;
+      const up = this.stats.addKill();
+      const skillPoint = this.stats.pointsEarned > points;
+      if (up) window.dispatchEvent(new CustomEvent('levelup', { detail: { level: this.stats.level, maxHp: this.stats.maxHp, skillPoint } }));
+      else if (skillPoint) window.dispatchEvent(new CustomEvent('skillpoint'));
     };
+    this.enemies.onPlayerHit = (dmg) => this._hurt(dmg);
     this.startPoint = null;             // Startpunkt der Welt (von main.js gesetzt)
     this.pending = null;                // Treffer, der in der Mitte des Schlags ausgelöst wird
     this.inventory = null;              // wird von main.js gesetzt
@@ -86,6 +92,7 @@ export class Game {
   // ---- Spiel starten ---------------------------------------------------------------
   startPlay({ characterId, x, z, yaw = 0, activeField, stats }) {
     this.stats.load(stats);
+    this.pendingDeath = false;
     if (this.actor) { this.scene.remove(this.actor.group); this.actor = null; }
     this.actor = createActor(characterId);
     this.actorId = characterId;
@@ -121,11 +128,33 @@ export class Game {
     this.actor?.setWeapon(this.inventory?.equip.weapon ?? null);
   }
 
+  // Schaden mit Schaden-Skill (+1 % pro Level)
+  _damage(w) { return (w?.damage ?? 2) * (1 + this.stats.bonus('damage')); }
+
   // Der eigentliche Treffer bzw. Schuss
   _release(w) {
-    const { x, z, yaw } = this.player, dx = Math.sin(yaw), dz = Math.cos(yaw);
-    if (!w || w.kind === 'melee') this.enemies.meleeHit({ x, z, dx, dz, range: w?.range ?? 1.8, damage: w?.damage ?? 2 });
-    else this.enemies.shoot({ x: x + dx * 0.7, y: 1.35, z: z + dz * 0.7, dx, dz, speed: w.speed, damage: w.damage, kind: w.projectile });
+    const { x, z, yaw } = this.player, dx = Math.sin(yaw), dz = Math.cos(yaw), damage = this._damage(w);
+    if (!w || w.kind === 'melee') this.enemies.meleeHit({ x, z, dx, dz, range: w?.range ?? 1.8, damage });
+    else this.enemies.shoot({ x: x + dx * 0.7, y: 1.35, z: z + dz * 0.7, dx, dz, speed: w.speed, damage, kind: w.projectile });
+  }
+
+  // Ein Zombie trifft den Spieler (Verteidigung-Skill senkt den Schaden)
+  _hurt(raw) {
+    if (this.mode !== 'play' || this.paused || this.pendingDeath) return;
+    this.stats.takeHit(raw);
+    if (this.stats.hp <= 0) { this.pendingDeath = true; return; }
+    window.dispatchEvent(new CustomEvent('playerhurt'));
+  }
+
+  // 0 HP: zurück zum Startpunkt, voll geheilt, Zombie-Haufen steht wieder an seinem Platz. Level, Kills und Skills bleiben.
+  _die() {
+    const s = this.startPoint ?? { x: this.player.x, z: this.player.z };
+    this.stats.hp = this.stats.maxHp;
+    this.player.x = s.x; this.player.z = s.z;
+    this.attackT = -1; this.pending = null; this.attackHeld = false;
+    this.enemies.spawnHorde(s, 10, 50);
+    this._syncActor();
+    window.dispatchEvent(new CustomEvent('playerdied'));
   }
 
   // Zuschlagen bzw. Waffe benutzen
@@ -141,7 +170,7 @@ export class Game {
     const tgt = this.enemies.nearestInCone(this.player.x, this.player.z, cx, cz, reach, 0.5);
     this.player.yaw = tgt ? Math.atan2(tgt.x - this.player.x, tgt.z - this.player.z) : Math.atan2(cx, cz);
     this.pending = { at: this.attackDur * (w?.releaseAt ?? 0.55), w };   // Treffer/Schuss im passenden Moment der Animation
-    window.dispatchEvent(new CustomEvent('playerattack', { detail: { weapon: w?.id ?? null, damage: w?.damage ?? 2 } }));
+    window.dispatchEvent(new CustomEvent('playerattack', { detail: { weapon: w?.id ?? null, damage: this._damage(w) } }));
     return true;
   }
 
@@ -284,6 +313,7 @@ export class Game {
 
     this.actor.update(dt, attacking ? this.attackT / this.attackDur : -1);
     if (!this.paused) this.enemies.update(dt, this.player);
+    if (this.pendingDeath) { this.pendingDeath = false; this._die(); }
     this._syncActor();
   }
 

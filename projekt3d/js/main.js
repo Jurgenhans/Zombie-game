@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import {
-  CHARACTERS, FIELD_SIZE, MAP_SIZE, BIOME, BIOME_NAMES, BIOME_SHARE,
+  CHARACTERS, FIELD_SIZE, MAP_SIZE, BIOME, BIOME_NAMES, BIOME_SHARE, SKILL_MAX,
 } from './config.js';
 import { generateFieldBiomes, buildSplat, countBiomes, findSpawnField, fieldCenter, fieldNumber, fieldRowCol } from './mapgen.js';
 import { loadAssets } from './characters.js';
@@ -15,12 +15,13 @@ import { TouchControls, initSlots, isTouchDevice } from './touch.js';
 import { Inventory } from './inventory.js';
 import { ITEMS } from './items.js';
 import { InventoryUI } from './inventory-ui.js';
+import { SKILLS, SKILL_KEYS } from './stats.js';
 
 window.__started = true;
 const $ = (id) => document.getElementById(id);
 
 // ---------- Hilfsfunktionen für Bildschirme ----------------------------------------
-const screens = ['loading', 'mainMenu', 'confirm', 'charSelect', 'bigMap', 'inventory', 'pause', 'errorBox'];
+const screens = ['loading', 'mainMenu', 'confirm', 'charSelect', 'bigMap', 'inventory', 'skills', 'pause', 'errorBox'];
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
 function showOnly(...ids) { screens.forEach((s) => (ids.includes(s) ? show(s) : hide(s))); }
@@ -108,6 +109,7 @@ function toMainMenu() {
   state = 'menu';
   paused = false;
   invOpen = false;
+  skillsOpen = false;
   hide('hud');
   refreshMenu();
   showOnly('mainMenu');
@@ -285,6 +287,42 @@ big.addEventListener('dblclick', (e) => {
   if (f >= 0) { selectedField = f; goToSelectedField(); }
 });
 
+// Skills: alle 100 Kills ein Punkt, den man auf einen der Skills legt
+let skillsOpen = false;
+function renderSkills() {
+  const s = game.stats;
+  $('skInfo').innerHTML = `Freie Skillpunkte: <b>${s.pointsFree}</b> · ` +
+    (s.killsToPoint ? `nächster Punkt in ${s.killsToPoint} Kills` : 'alle Skills voll') + ` · Kills gesamt: ${s.total}`;
+  $('skRows').innerHTML = SKILL_KEYS.map((k) => {
+    const lv = s.skills[k], def = SKILLS[k];
+    const pips = Array.from({ length: SKILL_MAX }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
+    return `<div class="sk-row"><div class="sk-icon">${def.icon}</div>` +
+      `<div><span class="sk-name">${def.label}<small>Level ${lv} / ${SKILL_MAX} · +${lv} %</small></span><div class="sk-desc">${def.desc}</div></div>` +
+      `<button class="sk-plus" data-skill="${k}" aria-label="${def.label} verbessern"${s.pointsFree > 0 && lv < SKILL_MAX ? '' : ' disabled'}>+</button>` +
+      `<div class="sk-pips">${pips}</div></div>`;
+  }).join('');
+}
+function openSkills() {
+  if (state !== 'game' || paused) return;
+  skillsOpen = true;
+  paused = game.paused = true;
+  renderSkills();
+  showOnly('skills');
+}
+function closeSkills() {
+  skillsOpen = false;
+  paused = game.paused = false;
+  showOnly();
+  updateHealthBar();
+}
+$('btnSkills').onclick = () => { if (skillsOpen) closeSkills(); else openSkills(); };
+$('btnSkillsClose').onclick = closeSkills;
+$('skRows').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-skill]');
+  if (!b) return;
+  if (game.stats.spend(b.dataset.skill)) { renderSkills(); saveNow(false); }
+});
+
 // Pause
 function openPause() { paused = game.paused = true; showOnly('pause'); }
 function closePause() { paused = game.paused = false; showOnly(); }
@@ -320,6 +358,7 @@ window.addEventListener('keydown', (e) => {
   if (state !== 'game') return;
   if (e.code === 'Escape') {
     if (bigOpen) closeBigMap();
+    else if (skillsOpen) closeSkills();
     else if (invOpen) closeInventory();
     else if (paused) closePause();
     else openPause();
@@ -327,6 +366,8 @@ window.addEventListener('keydown', (e) => {
     if (bigOpen) closeBigMap(); else if (!paused) openBigMap();
   } else if (e.code === 'KeyI') {
     if (invOpen) closeInventory(); else openInventory();
+  } else if (e.code === 'KeyK') {
+    if (skillsOpen) closeSkills(); else openSkills();
   } else if (e.code === 'KeyF' && !paused && !e.repeat) {
     game.attack();
   } else if (e.code === 'KeyG' && !paused) {
@@ -345,10 +386,20 @@ function updateHealthBar() {
   $('hhKills').textContent = s.isMaxLevel ? `${s.total} Kills · Max` : `${s.kills} / ${s.needed} Kills`;
   $('hhText').textContent = `${Math.ceil(s.hp)} / ${s.maxHp} HP`;
   $('hhFill').style.width = `${Math.max(0, Math.min(100, (s.hp / s.maxHp) * 100))}%`;
+  const badge = $('skBadge');
+  badge.textContent = s.pointsFree;
+  badge.classList.toggle('hidden', s.pointsFree <= 0);
 }
+window.addEventListener('skillpoint', () => { updateHealthBar(); toast('Neuer Skillpunkt! (Taste K / ⭐)'); });
+window.addEventListener('playerhurt', () => {
+  updateHealthBar();
+  const f = $('hurtFlash');
+  f.classList.remove('hit'); void f.offsetWidth; f.classList.add('hit');
+});
+window.addEventListener('playerdied', () => { updateHealthBar(); toast('Du wurdest besiegt – zurück am Startpunkt'); });
 window.addEventListener('levelup', (e) => {
   updateHealthBar();
-  toast(`Level ${e.detail.level}! Jetzt ${e.detail.maxHp} HP`);
+  toast(`Level ${e.detail.level}! Jetzt ${e.detail.maxHp} HP` + (e.detail.skillPoint ? ' · Neuer Skillpunkt!' : ''));
   if (state === 'game') saveNow(false);
 });
 

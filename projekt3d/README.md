@@ -60,5 +60,11 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Level 1 hat 100 HP, Level 2 hat 200 HP ... Level 10 hat 1000 HP (`HP_PER_LEVEL`, `MAX_LEVEL` in `js/config.js`).
 - Aufstieg von Level n auf n+1 braucht `KILLS_PER_LEVEL * n` Kills in diesem Level: 100, 200, 300 ... 900 (zusammen 4500 Kills bis Level 10). Beim Aufstieg ist man wieder voll geheilt.
 - Die Werte stehen in `js/stats.js` (`PlayerStats`, mit `damage()`/`heal()` für später) und im Spielstand.
-- Noch nicht eingebaut: Zombies verletzen den Spieler (der Balken sinkt also noch nicht).
+- **Zombies schlagen zu**, wenn sie nah genug sind: alle 1,4 s, Schlurfer 4 Schaden, Brocken 7 (`damage` in `js/zombies.js`, `HIT_INTERVAL` in `js/enemies.js`). Rotes Aufblitzen am Bildrand bei Treffern.
+- **0 HP**: Du landest voll geheilt am Startpunkt, der Zombie-Haufen steht wieder an seinem Platz. Level, Kills und Skills bleiben.
+
+## Skills (Taste **K** oder ⭐-Knopf)
+- Alle 100 Kills (gesamt) gibt es 1 Skillpunkt, den du selbst auf einen von 4 Skills legst: **Schaden, Lebenspunkte, Verteidigung, Resistenz**. Jeder Punkt gibt +1 %, jeder Skill hat höchstens Level 15 (= 15 %), zusammen also 60 Punkte (6000 Kills).
+- Einstellungen: `SKILL_KILLS`, `SKILL_STEP`, `SKILL_MAX` in `js/config.js`; Logik in `js/stats.js` (`spend`, `bonus`).
+- Wirkung: Lebenspunkte erhöhen die maximalen HP, Verteidigung senkt Zombie-Schaden, Schaden erhöht den Schadenswert der Waffen. **Hinweis:** Zombies halten weiter 2 Treffer aus, egal wie viel Schaden, der Schaden-Skill ändert daran noch nichts. **Resistenz** hat noch keine Wirkung, weil es noch keine Magie- oder Gift-Angriffe gibt.
 

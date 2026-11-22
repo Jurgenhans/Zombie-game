@@ -8,6 +8,7 @@ const AGGRO = 18;      // ab dieser Entfernung (m) bemerken sie den Spieler
 const LOSE = 35;       // ab dieser Entfernung geben sie auf
 const REACH = 1.5 * ZOMBIE_SCALE;     // so nah gehen sie heran
 const HITS_TO_KILL = 2;   // Treffer, die ein Zombie aushält (egal mit welcher Waffe)
+const HIT_INTERVAL = 1.4;   // Sekunden zwischen zwei Zombie-Schlägen (Schaden pro Typ: damage in zombies.js)
 const RESPAWN = 20;    // Sekunden, bis ein besiegter Zombie wieder aufsteht (zum Testen)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const ease = (t) => t * t * (3 - 2 * t);
@@ -35,6 +36,7 @@ export class EnemyManager {
     this.list = [];
     this.shots = [];
     this.onKill = null;   // wird aufgerufen, wenn ein Zombie besiegt wurde
+    this.onPlayerHit = null;   // (schaden, zombie): ein Zombie schlägt den Spieler
   }
 
   // count Zombies als dichter Haufen, dessen Mitte `radius` m vom Startpunkt entfernt liegt
@@ -198,10 +200,10 @@ export class EnemyManager {
 
     let moving = false;
     if (e.state === 'chase') {
-      if (d > REACH) { this._walk(e, player.x, player.z, t.speed, dt); moving = true; } else e.state = 'attack';
+      if (d > REACH) { this._walk(e, player.x, player.z, t.speed, dt); moving = true; } else { e.state = 'attack'; e.atkT = HIT_INTERVAL * 0.4; }
     } else if (e.state === 'attack') {
       if (d > REACH + 0.6) e.state = 'chase';
-      else { e.yaw += wrap(Math.atan2(dx, dz) - e.yaw) * (1 - Math.exp(-dt * 8)); e.atkT += dt; }
+      else { e.yaw += wrap(Math.atan2(dx, dz) - e.yaw) * (1 - Math.exp(-dt * 8)); e.atkT += dt; if (e.atkT >= HIT_INTERVAL) { e.atkT = 0; this.onPlayerHit?.(t.damage, e); } }
     } else if (e.state === 'return') {
       if (Math.hypot(e.bx - e.x, e.bz - e.z) < 0.8) e.state = 'idle';
       else { this._walk(e, e.bx, e.bz, t.speed * 0.8, dt); moving = true; }

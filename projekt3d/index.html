@@ -88,8 +88,9 @@
     </div>
     <div id="hudHelp" class="hud-card help">
       <b>WASD</b> Bewegen · <b>Shift</b> Rennen · <b>Maus ziehen</b> Kamera · <b>Mausrad</b> Zoom<br>
-      <b>M</b> Karte · <b>G</b> Gitter · <b>I</b> Inventar · <b>F</b> Schlagen · <b>Esc</b> Menü
+      <b>M</b> Karte · <b>G</b> Gitter · <b>I</b> Inventar · <b>K</b> Skills · <b>F</b> Schlagen · <b>Esc</b> Menü
     </div>
+    <div id="hurtFlash"></div>
     <div id="hudHealth" class="hud-health" aria-label="Lebensbalken">
       <div class="hh-top"><span id="hhLevel">Level 1</span><span id="hhKills">0 / 100 Kills</span></div>
       <div class="hh-bar"><div id="hhFill" class="hh-fill"></div><div id="hhText" class="hh-text">100 / 100 HP</div></div>
@@ -100,6 +101,7 @@
     <div id="joyBase" class="touch-ui"><div id="joyKnob"></div></div>
     <div id="touchBtns">
       <button id="btnInv" class="tbtn" aria-label="Inventar (I)" title="Inventar (I)">🎒</button>
+      <button id="btnSkills" class="tbtn" aria-label="Skills (K)" title="Skills (K)">⭐<span id="skBadge" class="badge hidden">0</span></button>
       <button id="btnPauseTouch" class="tbtn touch-only" aria-label="Menü">☰</button>
       <button id="btnGridTouch" class="tbtn touch-only" aria-label="Feldgitter">▦</button>
     </div>
@@ -165,6 +167,18 @@
         <div id="invInfoText"></div>
         <button id="btnInvAction" class="btn small primary hidden">Ausrüsten</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Skills -->
+  <div id="skills" class="screen modal hidden">
+    <div class="inv-panel sk-panel">
+      <div class="inv-head">
+        <h2>Skills</h2>
+        <button id="btnSkillsClose" class="btn small">Schließen ✕</button>
+      </div>
+      <div id="skInfo" class="sk-info"></div>
+      <div id="skRows" class="sk-rows"></div>
     </div>
   </div>
 

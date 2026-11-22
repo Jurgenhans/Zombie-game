@@ -53,6 +53,12 @@ export const MAX_LEVEL = 10;
 export const HP_PER_LEVEL = 100;
 export const KILLS_PER_LEVEL = 100;
 
+// Skills (Schaden, HP, Verteidigung, Resistenz): alle SKILL_KILLS Kills gibt es 1 Skillpunkt.
+// Jeder Punkt gibt in einem Skill +SKILL_STEP (1 %), jeder Skill hat höchstens SKILL_MAX Level (= 15 %).
+export const SKILL_MAX = 15;
+export const SKILL_KILLS = 100;
+export const SKILL_STEP = 0.01;
+
 // Inventar: Anzahl Felder (Spalten x Reihen). Im Querformat am Handy passen 10 x 6 am besten.
 export const INV_COLS = 10;
 export const INV_ROWS = 6;

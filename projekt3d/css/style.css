@@ -128,6 +128,25 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e0c09; col
 .hh-bar { position: relative; height: 22px; background: rgba(18, 14, 9, 0.8); border: 1px solid rgba(255, 200, 60, 0.4); border-radius: 999px; overflow: hidden; }
 .hh-fill { height: 100%; width: 100%; background: linear-gradient(#e8503a, #a8281a); transition: width .2s; }
 .hh-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; text-shadow: 0 1px 3px #000; }
+#hurtFlash { position: absolute; inset: 0; pointer-events: none !important; opacity: 0; background: radial-gradient(ellipse at center, rgba(200, 20, 10, 0) 45%, rgba(200, 20, 10, 0.55) 100%); }
+#hurtFlash.hit { animation: hurt 0.45s ease-out; }
+@keyframes hurt { from { opacity: 1; } to { opacity: 0; } }
+.tbtn { position: relative; }
+.badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: #e8503a; color: #fff; font: 700 0.7rem/18px var(--sans); text-align: center; }
+.sk-panel { min-width: min(520px, 94vw); }
+.sk-info { font-size: 0.9rem; color: var(--dim); margin-bottom: 0.6rem; line-height: 1.5; }
+.sk-info b { color: var(--gold); }
+.sk-rows { display: flex; flex-direction: column; gap: 8px; }
+.sk-row { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: 0.2rem 0.7rem; align-items: center; background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 0.5rem 0.7rem; }
+.sk-icon { font-size: 1.5rem; grid-row: span 2; text-align: center; }
+.sk-name { font-weight: 700; }
+.sk-name small { color: var(--gold); font-weight: 700; margin-left: 0.4rem; }
+.sk-desc { font-size: 0.75rem; color: var(--dim); }
+.sk-pips { grid-column: 2; display: flex; gap: 2px; }
+.sk-pips i { flex: 1; height: 6px; max-width: 18px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); }
+.sk-pips i.on { background: var(--gold); }
+.sk-plus { grid-column: 3; grid-row: 1 / span 3; width: 44px; height: 44px; font-size: 1.5rem; font-weight: 700; color: var(--ink); background: var(--gold); border: 0; border-radius: 10px; }
+.sk-plus:disabled { background: rgba(255, 255, 255, 0.12); color: var(--dim); }
 #miniWrap { position: absolute; right: 14px; bottom: 14px; cursor: pointer; border-radius: 6px; line-height: 0; }
 #miniMap { display: block; border-radius: 4px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55); transition: transform .12s; }
 #miniWrap:hover #miniMap { transform: scale(1.02); }
