@@ -1,3 +1,6 @@
+// IM SPIEL sind nur noch die 150 fertigen GLB-Modelle des Zombie-Sets (assets/zombies/) zu sehen (siehe createSetZombie).
+// Die selbstgebauten Würfel-Modelle unten werden nicht mehr verwendet; der Schlurfer bleibt nur als Ersatz, falls eine Datei fehlt.
+//
 // Lowpoly-Zombie-Modelle, komplett aus Würfeln gebaut (flach schattiert, mit Gelenken zum Animieren).
 //  - walker: "Schlurfer" (normal groß, blaues zerrissenes Hemd)
 //  - brute:  "Brocken"  (groß, breit, gebückt, Weste mit sichtbaren Rippen)
@@ -23,10 +26,8 @@ export const ZOMBIE_TYPES = {
   doctor:  { name: 'Doktor',      hp: 20, speed: 1.6, height: 1.85 * ZOMBIE_SCALE, radius: 0.55 * ZOMBIE_SCALE, lean: 0.12, damage: 4 },
   worker:  { name: 'Bauarbeiter', hp: 20, speed: 1.6, height: 1.85 * ZOMBIE_SCALE, radius: 0.55 * ZOMBIE_SCALE, lean: 0.12, damage: 4 },
 };
-export const NEW_ZOMBIE_KINDS = ['soldier', 'doctor', 'worker'];
 
-// Zombie-Set (GLB): dieselben Werte wie der Schlurfer. rest = Arme/Beine sind im Modell schon in Pose (Animation nur als Ausschlag).
-export const SET_ZOMBIE_KINDS = ZOMBIE_SET.map((z) => z.id);
+// Zombie-Set (GLB, 150 Modelle): dieselben Werte wie der Schlurfer. rest = Arme/Beine sind im Modell schon in Pose (Animation nur als Ausschlag).
 for (const z of ZOMBIE_SET) {
   ZOMBIE_TYPES[z.id] = { name: z.name, hp: 20, speed: 1.6, height: 1.85 * ZOMBIE_SCALE, radius: 0.55 * ZOMBIE_SCALE, lean: 0, damage: 4, glb: true, rest: true };
 }

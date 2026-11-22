@@ -1,15 +1,13 @@
 // Gegner: Zombie-Gruppe, Verhalten (Stehen / Verfolgen / Angreifen / Zurückgehen), Trefferlogik und Geschosse.
 
 import * as THREE from 'three';
-import { MAP_SIZE, FIELD_SIZE, FIELD_COUNT, GRID, MAP_SEED } from './config.js';
-import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE, NEW_ZOMBIE_KINDS, SET_ZOMBIE_KINDS } from './zombies.js';
+import { MAP_SIZE, FIELD_SIZE, FIELD_COUNT, GRID, MAP_SEED, HORDE_COUNT, MAP_ZOMBIES, ZOMBIE_PICK } from './config.js';
+import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE } from './zombies.js';
 
 const AGGRO = 18;      // ab dieser Entfernung (m) bemerken sie den Spieler
 const LOSE = 35;       // ab dieser Entfernung geben sie auf
 const REACH = 1.5 * ZOMBIE_SCALE;     // so nah gehen sie heran
 const HIT_INTERVAL = 1.4;   // Sekunden zwischen zwei Zombie-Schlägen (Schaden pro Typ: damage in zombies.js)
-const MAP_ZOMBIES = 60;   // so viele der neuen Zombie-Typen (3 selbstgebaute + 50 aus dem Set) stehen verteilt auf der Karte (je Feld höchstens einer, höchstens 99)
-const HORDE_SET = 10;     // so viele Modelle aus dem Zombie-Set stehen zusätzlich im Haufen am Start
 const VIEW_DIST = 350;    // ruhende Zombies weiter weg werden nicht gezeichnet und nicht animiert (spart Leistung)
 const RESPAWN = 20;    // Sekunden, bis ein besiegter Zombie wieder aufsteht (zum Testen)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -49,23 +47,15 @@ export class EnemyManager {
     this.onPlayerHit = null;   // (schaden, zombie): ein Zombie schlägt den Spieler
   }
 
-  // count Zombies als dichter Haufen, dessen Mitte `radius` m vom Startpunkt entfernt liegt
+  // Die Zombies in `kinds` als dichter Haufen, dessen Mitte `radius` m vom Startpunkt entfernt liegt
   // (dir = Richtung in rad; -PI/2 = nach Norden, also geradeaus vom Startpunkt aus gesehen).
-  // Abwechselnd Schlurfer / Brocken.
-  // `extra` = weitere Typen, die mitten im Haufen stehen (Plätze 2, 5, 8 ...).
-  spawnHorde(center, count = 10, radius = 50, dir = -Math.PI / 2, extra = []) {
+  spawnHorde(center, kinds, radius = 50, dir = -Math.PI / 2) {
     this.clear();
     const cx = center.x + Math.cos(dir) * radius, cz = center.z + Math.sin(dir) * radius;
-    const kinds = ['walker', 'brute'];
-    const total = count + extra.length;
-    let old = 0, next = 0;
-    for (let i = 0; i < total; i++) {
-      // die zusätzlichen Typen gleichmäßig zwischen Schlurfern und Brocken verteilen
-      const isExtra = Math.floor(((i + 1) * extra.length) / total) > Math.floor((i * extra.length) / total);
-      const kind = isExtra ? extra[next++] : kinds[old++ % 2];
+    kinds.forEach((kind, i) => {
       const a = i * 2.39996, r = 1.35 * Math.sqrt(i);                    // Sonnenblumen-Muster: dicht, ohne Überlappung
       this._add(kind, cx + Math.cos(a) * r, cz + Math.sin(a) * r, Math.random() * Math.PI * 2);
-    }
+    });
   }
 
   // `count` Zombies der Typen `kinds` (reihum) verteilt über die Karte: jeweils in einem anderen Feld, nie im Startfeld.
@@ -86,10 +76,10 @@ export class EnemyManager {
     }
   }
 
-  // Die ganze Zombie-Welt: der Haufen am Start (mit den 3 neuen Typen mittendrin) und die verteilten Zombies
+  // Die ganze Zombie-Welt: der Haufen am Start und die verteilten Zombies (je ein anderes Modell aus dem Zombie-Set)
   spawnWorld(start) {
-    this.spawnHorde(start, 10, 50, -Math.PI / 2, [...NEW_ZOMBIE_KINDS, ...SET_ZOMBIE_KINDS.slice(0, HORDE_SET)]);
-    this.spawnScattered(MAP_ZOMBIES, [...NEW_ZOMBIE_KINDS, ...SET_ZOMBIE_KINDS], start);   // alle 53 Typen kommen auf der Karte vor
+    this.spawnHorde(start, ZOMBIE_PICK.slice(0, HORDE_COUNT), 50);
+    this.spawnScattered(MAP_ZOMBIES, ZOMBIE_PICK.slice(HORDE_COUNT), start);
   }
 
   // Alle Zombies zurück an ihren Platz (volle HP), ohne die Modelle neu zu bauen

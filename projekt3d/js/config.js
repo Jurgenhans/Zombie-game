@@ -32,11 +32,22 @@ export const CHARACTERS = [
   { id: 'Rogue_Hooded',  name: 'Schurke (Kapuze)',  desc: 'Der Schatten unter den Abenteurern. Man sieht ihn nie kommen.' },
 ];
 
-// Zombie-Set: 50 fertige 3D-Modelle (GLB) in assets/zombies/. Ids: set01 ... set50
-export const ZOMBIE_SET = Array.from({ length: 50 }, (_, i) => {
-  const n = String(i + 1).padStart(2, '0');
-  return { id: `set${n}`, name: `Zombie ${i + 1}`, url: `assets/zombies/Zombie_0${n}.glb` };
+// Zombie-Set: 150 fertige 3D-Modelle (GLB) in assets/zombies/. Ids: set001 ... set150
+export const ZOMBIE_SET = Array.from({ length: 150 }, (_, i) => {
+  const n = String(i + 1).padStart(3, '0');
+  return { id: `set${n}`, name: `Zombie ${i + 1}`, url: `assets/zombies/Zombie_${n}.glb` };
 });
+
+// So viele Zombies gibt es: ein Haufen am Start und dazu welche verteilt auf der Karte (je Feld höchstens einer, also höchstens 99)
+export const HORDE_COUNT = 23;
+export const MAP_ZOMBIES = 60;
+// Bei jedem Spielstart eine andere Auswahl aus dem Set (jedes Modell höchstens einmal): zuerst der Haufen, dann die verteilten.
+// Nur diese Modelle werden geladen (spart Ladezeit und Speicher).
+export const ZOMBIE_PICK = (() => {
+  const ids = ZOMBIE_SET.map((z) => z.id);
+  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  return ids.slice(0, Math.min(ids.length, HORDE_COUNT + MAP_ZOMBIES));
+})();
 
 // Spielergeschwindigkeit (Meter pro Sekunde)
 export const WALK_SPEED = 5;

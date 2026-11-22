@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { CHARACTERS, ZOMBIE_SET } from './config.js';
+import { CHARACTERS, ZOMBIE_SET, ZOMBIE_PICK } from './config.js';
 import { createWeaponMesh, WEAPON_STYLE } from './weapons.js';
 
 const loader = new GLTFLoader();
@@ -12,7 +12,7 @@ export const assets = { models: {}, clips: {}, zombies: {} };
 export async function loadAssets(onProgress) {
   const jobs = [
     ...CHARACTERS.map((c) => ({ kind: 'char', id: c.id, url: `assets/characters/${c.id}.glb` })),
-    ...ZOMBIE_SET.map((z) => ({ kind: 'zombie', id: z.id, url: z.url })),
+    ...ZOMBIE_SET.filter((z) => ZOMBIE_PICK.includes(z.id)).map((z) => ({ kind: 'zombie', id: z.id, url: z.url })),
     { kind: 'anim', url: 'assets/animations/Rig_Medium_General.glb' },
     { kind: 'anim', url: 'assets/animations/Rig_Medium_MovementBasic.glb' },
   ];
