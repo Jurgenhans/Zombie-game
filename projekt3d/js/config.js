@@ -32,6 +32,12 @@ export const CHARACTERS = [
   { id: 'Rogue_Hooded',  name: 'Schurke (Kapuze)',  desc: 'Der Schatten unter den Abenteurern. Man sieht ihn nie kommen.' },
 ];
 
+// Zombie-Set: 10 fertige 3D-Modelle (GLB) in assets/zombies/. Ids: set01 ... set10
+export const ZOMBIE_SET = Array.from({ length: 10 }, (_, i) => {
+  const n = String(i + 1).padStart(2, '0');
+  return { id: `set${n}`, name: `Zombie ${i + 1}`, url: `assets/zombies/Zombie_0${n}.glb` };
+});
+
 // Spielergeschwindigkeit (Meter pro Sekunde)
 export const WALK_SPEED = 5;
 export const RUN_SPEED = 14;

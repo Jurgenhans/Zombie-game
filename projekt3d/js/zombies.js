@@ -5,9 +5,12 @@
 //  - soldier: "Soldat" (Feldjacke, Helm, Gürtel mit Taschen)
 //  - doctor:  "Doktor" (Kittel mit Blutflecken, Mundschutz, Brille)
 //  - worker:  "Bauarbeiter" (Warnweste, gelber Helm, Arbeitshandschuhe)
+// Zusätzlich das Zombie-Set aus 10 fertigen GLB-Modellen (assets/zombies/): gleiche Größe und Werte wie der Schlurfer.
 // Figur blickt nach +Z, Füße bei y = 0.
 
 import * as THREE from 'three';
+import { ZOMBIE_SET } from './config.js';
+import { assets } from './characters.js';
 
 export const ZOMBIE_SCALE = 1.3;   // Größe der Zombies (1.3 = 30 % größer)
 
@@ -21,6 +24,12 @@ export const ZOMBIE_TYPES = {
   worker:  { name: 'Bauarbeiter', hp: 20, speed: 1.6, height: 1.85 * ZOMBIE_SCALE, radius: 0.55 * ZOMBIE_SCALE, lean: 0.12, damage: 4 },
 };
 export const NEW_ZOMBIE_KINDS = ['soldier', 'doctor', 'worker'];
+
+// Zombie-Set (GLB): dieselben Werte wie der Schlurfer. rest = Arme/Beine sind im Modell schon in Pose (Animation nur als Ausschlag).
+export const SET_ZOMBIE_KINDS = ZOMBIE_SET.map((z) => z.id);
+for (const z of ZOMBIE_SET) {
+  ZOMBIE_TYPES[z.id] = { name: z.name, hp: 20, speed: 1.6, height: 1.85 * ZOMBIE_SCALE, radius: 0.55 * ZOMBIE_SCALE, lean: 0, damage: 4, glb: true, rest: true };
+}
 
 const PARAMS = {
   walker: {
@@ -59,7 +68,71 @@ function box(w, h, d, m, x = 0, y = 0, z = 0) {
   return o;
 }
 
+// Ein Zombie aus dem GLB-Set. Das Gerüst (Beine, Arme, Kopf, Körper) wird an der Struktur erkannt:
+//   Figur -> [Becken (Mesh), Bein, Bein, Körper], Körper -> [Arm, Arm, Kopf]  (alle 10 Dateien sind so gebaut).
+// Jedes Gelenk bekommt einen eigenen Drehpunkt (Gruppe) an der Gelenkposition. Dreht man den Drehpunkt auf 0,
+// steht das Glied wie im Modell, dadurch wirkt die Animation als Ausschlag um die mitgelieferte Haltung.
+function createSetZombie(typeId) {
+  const src = assets.zombies[typeId];
+  const fail = (why) => { console.warn(`Zombie ${typeId}: ${why}, nehme den Schlurfer`); return null; };
+  if (!src) return fail('Modell nicht geladen');
+
+  const root = src.clone(true);
+  let fig = root;
+  while (fig.children.length === 1 && !fig.children[0].isMesh) fig = fig.children[0];
+  const groups = fig.children.filter((c) => !c.isMesh);
+  const legs = groups.filter((c) => Math.abs(c.position.x) > 0.05);
+  const bodyN = groups.find((c) => Math.abs(c.position.x) <= 0.05);
+  if (legs.length !== 2 || !bodyN) return fail('Körperbau nicht erkannt');
+  const sub = bodyN.children.filter((c) => !c.isMesh);
+  const arms = sub.filter((c) => Math.abs(c.position.x) > 0.1);
+  const headN = sub.find((c) => Math.abs(c.position.x) <= 0.1);
+  if (arms.length !== 2 || !headN) return fail('Arme/Kopf nicht erkannt');
+
+  // Eigene Materialien je Zombie (für den Treffer-Blitz); Texturen bleiben gemeinsam
+  // (Teile mit demselben Material teilen sich auch das Klon-Material: ca. 15 statt 60 Materialien je Zombie)
+  const mats = [], copies = new Map();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.frustumCulled = false;
+    let m = copies.get(o.material);
+    if (!m) {
+      m = o.material.clone();
+      copies.set(o.material, m);
+      if (m.emissive) { m.userData.e0 = m.emissive.getHex(); m.userData.i0 = m.emissiveIntensity; mats.push(m); }
+    }
+    o.material = m;
+  });
+
+  const pivot = (node) => {
+    const w = new THREE.Group();
+    w.position.copy(node.position);
+    node.position.set(0, 0, 0);
+    node.parent.add(w);
+    w.add(node);
+    return w;
+  };
+  const byX = (a) => a.sort((m, n) => m.position.x - n.position.x);
+  const [legL, legR] = byX(legs).map(pivot), [armL, armR] = byX(arms).map(pivot);
+  const head = pivot(headN), body = pivot(bodyN);
+
+  // Größe: wie der Schlurfer, Füße auf dem Boden
+  const inner = new THREE.Group();
+  inner.add(root);
+  const g = new THREE.Group();
+  g.add(inner);
+  g.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(g);
+  const h = box.max.y - box.min.y;
+  if (!(h > 0.5 && h < 10)) return fail('Größe nicht lesbar');
+  inner.position.y = -box.min.y;
+  g.scale.setScalar(ZOMBIE_TYPES[typeId].height / h);
+
+  return { group: g, rig: { body, legL, legR, armL, armR, head, baseY: body.position.y }, mats };
+}
+
 export function createZombieModel(typeId) {
+  if (ZOMBIE_TYPES[typeId]?.glb) { const m = createSetZombie(typeId); if (m) return m; typeId = 'walker'; }
   const p = PARAMS[typeId];
   const mats = [];
   const M = (c, extra) => { const m = flat(c, extra); m.userData.e0 = m.emissive.getHex(); m.userData.i0 = m.emissiveIntensity; mats.push(m); return m; };

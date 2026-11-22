@@ -2,13 +2,13 @@
 
 import * as THREE from 'three';
 import { MAP_SIZE, FIELD_SIZE, FIELD_COUNT, GRID, MAP_SEED } from './config.js';
-import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE, NEW_ZOMBIE_KINDS } from './zombies.js';
+import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE, NEW_ZOMBIE_KINDS, SET_ZOMBIE_KINDS } from './zombies.js';
 
 const AGGRO = 18;      // ab dieser Entfernung (m) bemerken sie den Spieler
 const LOSE = 35;       // ab dieser Entfernung geben sie auf
 const REACH = 1.5 * ZOMBIE_SCALE;     // so nah gehen sie heran
 const HIT_INTERVAL = 1.4;   // Sekunden zwischen zwei Zombie-Schlägen (Schaden pro Typ: damage in zombies.js)
-const MAP_ZOMBIES = 40;   // so viele der drei neuen Zombie-Typen stehen verteilt auf der Karte (je Feld höchstens einer)
+const MAP_ZOMBIES = 40;   // so viele der neuen Zombie-Typen (3 selbstgebaute + 10 aus dem Set) stehen verteilt auf der Karte (je Feld höchstens einer)
 const VIEW_DIST = 350;    // ruhende Zombies weiter weg werden nicht gezeichnet und nicht animiert (spart Leistung)
 const RESPAWN = 20;    // Sekunden, bis ein besiegter Zombie wieder aufsteht (zum Testen)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -17,7 +17,7 @@ const ease = (t) => t * t * (3 - 2 * t);
 // Speicher freigeben, wenn Modelle entfernt werden (die gemeinsame Schatten-Textur bleibt erhalten)
 function disposeTree(root) {
   root.traverse((o) => {
-    if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); }
+    if (o.isMesh) { if (!o.geometry.userData.keep) o.geometry.dispose(); o.material.dispose(); }
     else if (o.isSprite) o.material.dispose();
   });
 }
@@ -56,11 +56,12 @@ export class EnemyManager {
     this.clear();
     const cx = center.x + Math.cos(dir) * radius, cz = center.z + Math.sin(dir) * radius;
     const kinds = ['walker', 'brute'];
-    const extraAt = extra.map((_, k) => 2 + k * 3);
-    let old = 0;
-    for (let i = 0; i < count + extra.length; i++) {
-      const k = extraAt.indexOf(i);
-      const kind = k >= 0 ? extra[k] : kinds[old++ % 2];
+    const total = count + extra.length;
+    let old = 0, next = 0;
+    for (let i = 0; i < total; i++) {
+      // die zusätzlichen Typen gleichmäßig zwischen Schlurfern und Brocken verteilen
+      const isExtra = Math.floor(((i + 1) * extra.length) / total) > Math.floor((i * extra.length) / total);
+      const kind = isExtra ? extra[next++] : kinds[old++ % 2];
       const a = i * 2.39996, r = 1.35 * Math.sqrt(i);                    // Sonnenblumen-Muster: dicht, ohne Überlappung
       this._add(kind, cx + Math.cos(a) * r, cz + Math.sin(a) * r, Math.random() * Math.PI * 2);
     }
@@ -86,8 +87,9 @@ export class EnemyManager {
 
   // Die ganze Zombie-Welt: der Haufen am Start (mit den 3 neuen Typen mittendrin) und die verteilten Zombies
   spawnWorld(start) {
-    this.spawnHorde(start, 10, 50, -Math.PI / 2, NEW_ZOMBIE_KINDS);
-    this.spawnScattered(MAP_ZOMBIES, NEW_ZOMBIE_KINDS, start);
+    const extra = [...NEW_ZOMBIE_KINDS, ...SET_ZOMBIE_KINDS];     // 3 selbstgebaute + 10 aus dem Zombie-Set
+    this.spawnHorde(start, 10, 50, -Math.PI / 2, extra);
+    this.spawnScattered(MAP_ZOMBIES, extra, start);
   }
 
   // Alle Zombies zurück an ihren Platz (volle HP), ohne die Modelle neu zu bauen
@@ -221,6 +223,7 @@ export class EnemyManager {
 
   _updateZombie(e, dt, player) {
     const r = e.rig, t = e.type;
+    const R = t.rest;   // true: Arme sind im Modell schon nach vorn gestreckt, die Animation ist nur ein Ausschlag darum
     // Trefferblitz
     if (e.flash > 0 || e._flashing) {
       e.flash = Math.max(0, e.flash - dt);
@@ -233,7 +236,7 @@ export class EnemyManager {
       e.deathT += dt;
       e.model.group.rotation.x = -ease(Math.min(1, e.deathT / 0.7)) * (Math.PI / 2);   // fällt nach hinten
       e.model.group.position.y = ease(Math.min(1, e.deathT / 0.7)) * 0.12;
-      r.armL.rotation.x = -0.4; r.armR.rotation.x = -0.9; r.legL.rotation.x = 0.1; r.legR.rotation.x = -0.15;
+      r.armL.rotation.x = R ? 0.5 : -0.4; r.armR.rotation.x = R ? 0.2 : -0.9; r.legL.rotation.x = 0.1; r.legR.rotation.x = -0.15;
       if (e.deathT > 12) e.holder.position.y = -(e.deathT - 12) * 0.12;             // versinkt
       if (e.deathT > RESPAWN) this._reset(e);
       return;
@@ -261,17 +264,17 @@ export class EnemyManager {
     const p = e.phase;
     if (moving) {
       r.legL.rotation.x = Math.sin(p) * 0.55; r.legR.rotation.x = -Math.sin(p) * 0.55;
-      r.armL.rotation.x = -1.35 + Math.sin(p * 0.5) * 0.12; r.armR.rotation.x = -1.25 - Math.sin(p * 0.5) * 0.12;
+      r.armL.rotation.x = (R ? 0 : -1.35) + Math.sin(p * 0.5) * 0.12; r.armR.rotation.x = (R ? 0 : -1.25) - Math.sin(p * 0.5) * 0.12;
       r.body.rotation.x = t.lean + 0.1; r.body.rotation.z = Math.sin(p) * 0.05;
       r.body.position.y = r.baseY + Math.abs(Math.sin(p)) * 0.035;
       r.head.rotation.z = Math.sin(p * 0.5) * 0.12;
     } else if (e.state === 'attack') {
       r.legL.rotation.x = r.legR.rotation.x = 0;
-      r.armL.rotation.x = -1.1 + Math.sin(p) * 0.6; r.armR.rotation.x = -1.1 - Math.sin(p) * 0.6;
+      r.armL.rotation.x = (R ? 0 : -1.1) + Math.sin(p) * 0.6; r.armR.rotation.x = (R ? 0 : -1.1) - Math.sin(p) * 0.6;
       r.body.rotation.x = t.lean + 0.12 + Math.sin(p) * 0.06; r.body.rotation.z = 0; r.body.position.y = r.baseY;
     } else {
       r.legL.rotation.x = r.legR.rotation.x = 0;
-      r.armL.rotation.x = -0.3 + Math.sin(p) * 0.08; r.armR.rotation.x = -0.25 - Math.sin(p * 0.9) * 0.08;
+      r.armL.rotation.x = (R ? 0 : -0.3) + Math.sin(p) * 0.08; r.armR.rotation.x = (R ? 0 : -0.25) - Math.sin(p * 0.9) * 0.08;
       r.body.rotation.x = t.lean; r.body.rotation.z = Math.sin(p * 0.5) * 0.04; r.body.position.y = r.baseY;
       r.head.rotation.z = Math.sin(p * 0.6) * 0.1;
     }

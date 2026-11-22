@@ -53,7 +53,12 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Zombies haben **Lebenspunkte** (`hp` in `js/zombies.js`: Schlurfer 20, Brocken 40). Jeder Treffer zieht den Schaden der Waffe ab (Schwert 10, Axt 14, Bogen 8, Stab 12, Armbrust 11, Faust 2, dazu der Schaden-Skill). Wer mindestens so viel Schaden macht wie der Zombie HP hat, besiegt ihn mit **einem** Treffer.
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
-- **Drei weitere, genauere Lowpoly-Zombies** (`soldier` Soldat, `doctor` Doktor, `worker` Bauarbeiter, in `js/zombies.js`): gleiche Größe und gleiche Werte wie der Schlurfer. Je einer steht im Haufen, dazu stehen **40 Zombies verteilt auf der Karte** (je Feld höchstens einer, nie im Startfeld, feste Verteilung). Weit entfernte, ruhende Zombies werden nicht gezeichnet (`VIEW_DIST` in `js/enemies.js`).
+- **Drei weitere, genauere Lowpoly-Zombies** (`soldier` Soldat, `doctor` Doktor, `worker` Bauarbeiter, in `js/zombies.js`) und das **Zombie-Set** aus 10 fertigen GLB-Modellen (`assets/zombies/Zombie_001.glb` bis `Zombie_010.glb`, Typen `set01` bis `set10`): alle haben dieselbe Größe und dieselben Werte wie der Schlurfer (20 HP, 4 Schaden, gleiche Geschwindigkeit, gleiches Verhalten).
+  - Je einer von diesen 13 Typen steht im Haufen am Start (zusammen 23 Zombies).
+  - Dazu stehen **40 Zombies verteilt auf der Karte** (reihum diese 13 Typen, je Feld höchstens einer, nie im Startfeld, feste Verteilung: `MAP_ZOMBIES` in `js/enemies.js`).
+  - Weit entfernte, ruhende Zombies werden nicht gezeichnet (`VIEW_DIST` in `js/enemies.js`).
+  - Die GLB-Modelle haben keine Skelette. Beine, Arme, Kopf und Körper werden an der Struktur der Datei erkannt (`createSetZombie` in `js/zombies.js`) und per Code bewegt, als Ausschlag um die Haltung im Modell. Ein neues Modell im selben Aufbau legt man in `assets/zombies/` und trägt es in `ZOMBIE_SET` (`js/config.js`) ein.
+  - Die GLB-Modelle haben je ca. 11 000 Dreiecke und 64 Teile. Wenn es auf einem schwachen Handy ruckelt, helfen weniger Zombies (`MAP_ZOMBIES`) oder eine kleinere `VIEW_DIST`.
 - Anzahl, Abstand und Richtung des Haufens: `spawnHorde(...)` in `js/game.js`.
 
 ## Level und Lebensbalken

@@ -3,15 +3,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { CHARACTERS } from './config.js';
+import { CHARACTERS, ZOMBIE_SET } from './config.js';
 import { createWeaponMesh, WEAPON_STYLE } from './weapons.js';
 
 const loader = new GLTFLoader();
-export const assets = { models: {}, clips: {} };
+export const assets = { models: {}, clips: {}, zombies: {} };
 
 export async function loadAssets(onProgress) {
   const jobs = [
     ...CHARACTERS.map((c) => ({ kind: 'char', id: c.id, url: `assets/characters/${c.id}.glb` })),
+    ...ZOMBIE_SET.map((z) => ({ kind: 'zombie', id: z.id, url: z.url })),
     { kind: 'anim', url: 'assets/animations/Rig_Medium_General.glb' },
     { kind: 'anim', url: 'assets/animations/Rig_Medium_MovementBasic.glb' },
   ];
@@ -20,6 +21,9 @@ export async function loadAssets(onProgress) {
     const gltf = await loader.loadAsync(job.url);
     if (job.kind === 'char') {
       assets.models[job.id] = gltf.scene;
+    } else if (job.kind === 'zombie') {
+      gltf.scene.traverse((o) => { if (o.isMesh) o.geometry.userData.keep = true; });   // gemeinsam genutzt: nicht freigeben
+      assets.zombies[job.id] = gltf.scene;
     } else {
       for (const clip of gltf.animations) if (clip.name !== 'T-Pose') assets.clips[clip.name] = clip;
     }
