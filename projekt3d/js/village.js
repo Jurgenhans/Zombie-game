@@ -184,6 +184,26 @@ export function createVillage(models) {
   put('props_barrel_01', gX + 11.5, gZ + 10.2, 0, { solid: 'circle' });
   put('props_basket_01', gX + 10.2, gZ + 10.6, 0.5);
 
+  // ---- Dorfmauer ------------------------------------------------------------------------------------------------------
+  // Es gibt kein Mauer- oder Tormodell, deshalb besteht die Mauer aus dem Holzzaun in doppelter Größe (2 m lang, 2,5 m hoch).
+  // Rechteck 90 m x 168 m um das Dorf, Eingang (10 m breit) in der Mitte der Südseite, auf der Dorfstraße Richtung Feld 45.
+  const WS = 2;                                                    // Maßstab des Zaunteils
+  const WX0 = CX - 45, WX1 = CX + 45, WZ0 = Z0 + 130, WZ1 = Z_END - 2;
+  const GATE = 5;                                                  // halbe Breite des Eingangs (Meter)
+  const wallRun = (x0, z0, x1, z1, gate = false) => {
+    const alongX = z0 === z1, len = Math.abs(alongX ? x1 - x0 : z1 - z0), sgn = Math.sign(alongX ? x1 - x0 : z1 - z0);
+    for (let i = 0; i < len / WS; i++) {
+      const t = (i + 0.5) * WS, px = alongX ? x0 + sgn * t : x0, pz = alongX ? z0 : z0 + sgn * t;
+      if (gate && Math.abs(px - CX) < GATE) continue;
+      put('props_fence_wood_01', px, pz, alongX ? 0 : Math.PI / 2, { solid: 'box', s: WS });
+    }
+  };
+  wallRun(WX0, WZ0, WX1, WZ0);                                     // Nord
+  wallRun(WX0, WZ1, WX1, WZ1, true);                               // Süd, mit Eingang
+  wallRun(WX0, WZ0, WX0, WZ1);                                     // West
+  wallRun(WX1, WZ0, WX1, WZ1);                                     // Ost
+  for (const [x, z] of [[WX0, WZ0], [WX1, WZ0], [WX0, WZ1], [WX1, WZ1], [CX - GATE, WZ1], [CX + GATE, WZ1]]) put('props_fence_wood_end_01', x, z, 0, { s: WS });   // Eckpfosten und Torpfosten
+
   // ---- Kollision --------------------------------------------------------------------------------------------------
   const MINX = X0 + 20, MAXX = X0 + FIELD_SIZE - 20;   // grober Schnelltest: nur im Dorfbereich prüfen
   return {

@@ -84,6 +84,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 
 ## Dorf (Feld 35)
 - `js/village.js`: Dorf mit 6 Häusern (je 3 links und rechts einer Erdstraße), Dorfplatz mit Brunnen, 3 Marktständen, Bänken und Waren, Hühnerhof mit Zaun, Gemüsegarten mit Vogelscheuche, Bienenstöcke, Apfelbäume, Holzstapel, Fässer, Kisten usw. Modelle: `assets/village/` (Avramania Free Collection, CC0).
+- **Dorfmauer:** Eine Holzwand (90 m x 168 m) umschließt das Dorf, mit einem 10 m breiten **Eingang in der Mitte der Südseite** auf der Dorfstraße, Richtung Feld 45 (`wallRun` in `js/village.js`). Es gibt kein Mauer- oder Tormodell, deshalb besteht sie aus dem vorhandenen Holzzaun in doppelter Größe (2 m lang, 2,5 m hoch, `WS`). Der Spieler kann nur durch den Eingang hinein und hinaus. Zombies laufen noch durch die Mauer (sie kennen keine Hindernisse im Dorf).
 - Die Dorfstraße liegt auf x = 1350, also genau auf der Linie des Wegs durch den Wald in Feld 45: Weg Feld 55 -> Feld 45 -> Feld 35 -> Dorfplatz.
 - Häuser, Stände, Zäune und größeres Zubehör sind für den Spieler fest (`collide`). Hausposition und Zubehör stehen als Liste in `createVillage` (Koordinaten in Metern).
 
