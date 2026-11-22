@@ -77,7 +77,8 @@ export class Game {
       }
     };
     this.enemies.onPlayerHit = (dmg) => this._hurt(dmg);
-    this.startPoint = null;             // Startpunkt der Welt (von main.js gesetzt)
+    this.startPoint = null;             // Startpunkt des Spielers, auch zum Wiederbeleben (von main.js gesetzt: im Dorf)
+    this.hordeBase = null;              // Bezugspunkt des Zombie-Haufens (von main.js gesetzt: Mitte von Feld 45)
     this.pending = null;                // Treffer, der in der Mitte des Schlags ausgelöst wird
     this.inventory = null;              // wird von main.js gesetzt
     this.attackT = -1; this.attackDur = 0;
@@ -140,7 +141,7 @@ export class Game {
     this.pending = null;
     this.applyEquipment();
     this.player = { x, z, yaw };
-    this.enemies.spawnWorld(this.startPoint ?? { x, z });   // Haufen 50 m vom Startpunkt + 40 neue Zombies verteilt auf der Karte
+    this.enemies.spawnWorld(this.hordeBase ?? { x, z }, this.startPoint);   // Haufen 50 m nördlich vom Bezugspunkt (+ ggf. verteilte Zombies, nie im Dorf)
     this.cam.yaw = yaw + Math.PI;   // Kamera hinter die Figur
     this.mode = 'play';
     this.paused = false;

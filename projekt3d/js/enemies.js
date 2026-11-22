@@ -58,14 +58,14 @@ export class EnemyManager {
     });
   }
 
-  // `count` Zombies der Typen `kinds` (reihum) verteilt über die Karte: jeweils in einem anderen Feld, nie im Startfeld.
+  // `count` Zombies der Typen `kinds` (reihum) verteilt über die Karte: jeweils in einem anderen Feld, nie in den Feldern der Punkte in `avoid`.
   // Feste Zufallsfolge (MAP_SEED), die Verteilung ist also bei jedem Start gleich.
-  spawnScattered(count, kinds, start) {
+  spawnScattered(count, kinds, ...avoid) {
     let s = (MAP_SEED ^ 0x9e3779b9) >>> 0;
     const rnd = () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const startField = Math.floor(start.z / FIELD_SIZE) * GRID + Math.floor(start.x / FIELD_SIZE);
+    const skip = new Set(avoid.filter(Boolean).map((p) => Math.floor(p.z / FIELD_SIZE) * GRID + Math.floor(p.x / FIELD_SIZE)));
     const fields = [];
-    for (let i = 0; i < FIELD_COUNT; i++) if (i !== startField) fields.push(i);
+    for (let i = 0; i < FIELD_COUNT; i++) if (!skip.has(i)) fields.push(i);
     for (let i = fields.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [fields[i], fields[j]] = [fields[j], fields[i]]; }
     const margin = 30;                                                     // Abstand zum Feldrand
     for (let i = 0; i < count; i++) {
@@ -77,9 +77,10 @@ export class EnemyManager {
   }
 
   // Die ganze Zombie-Welt: der Haufen am Start und die verteilten Zombies (je ein anderes Modell aus dem Zombie-Set)
-  spawnWorld(start) {
-    this.spawnHorde(start, ZOMBIE_PICK.slice(0, HORDE_COUNT), 50);
-    this.spawnScattered(MAP_ZOMBIES, ZOMBIE_PICK.slice(HORDE_COUNT), start);
+  // horde = Bezugspunkt des Haufens (er steht 50 m nördlich davon), safe = Startpunkt des Spielers (dort stehen keine verteilten Zombies)
+  spawnWorld(horde, safe) {
+    this.spawnHorde(horde, ZOMBIE_PICK.slice(0, HORDE_COUNT), 50);
+    this.spawnScattered(MAP_ZOMBIES, ZOMBIE_PICK.slice(HORDE_COUNT), horde, safe);
   }
 
   // Alle Zombies zurück an ihren Platz (volle HP), ohne die Modelle neu zu bauen

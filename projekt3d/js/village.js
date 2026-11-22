@@ -14,6 +14,9 @@ const CX = X0 + FIELD_SIZE / 2;                                   // Mitte der D
 const Z_END = Z0 + FIELD_SIZE;                                    // Südrand von Feld 35 = Nordrand von Feld 45
 const PLAZA = { x: CX, z: Z0 + 175, r: 11 };                      // Dorfplatz (z = 1075)
 const STREET_W = 6;
+// Startpunkt des Spielers (neues Spiel und Wiederbeleben nach dem Tod): auf der Dorfstraße direkt vor dem Dorfplatz,
+// Blick nach Norden zu Brunnen und Händler. Frei von Häusern und Zubehör.
+export const VILLAGE_START = { x: CX, z: PLAZA.z + 13, yaw: Math.PI };
 // Standort des Händlers: am Dorfplatz, blickt zur Straße (Süden) und zum Brunnen
 export const MERCHANT_SPOT = { x: CX + 6, z: PLAZA.z - 3, yaw: Math.atan2(-6, 11) };
 

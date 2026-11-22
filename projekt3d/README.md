@@ -49,7 +49,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Nahkampf und Faust nutzen die Animation "Throw" (das Paket hat keine Nahkampf-Animationen). Bogen, Armbrust und Stab nutzen die zweite Animation "Use_Item"; sie wird pro Waffe in `js/items.js` mit `anim` gesetzt, der Schuss-Zeitpunkt mit `releaseAt` (0..1).
 
 ## Zombies
-- Ein dichter Haufen Zombies steht in Feld 45, seine Mitte liegt 50 m vom Startpunkt (Mitte von Feld 45) entfernt (geradeaus nach Norden, also in Blickrichtung beim Start). Die Zombies sind 2,4 m groß (`ZOMBIE_SCALE` in `js/zombies.js`), Modelle und Anzahl siehe unten.
+- Ein dichter Haufen Zombies steht in Feld 45, seine Mitte liegt 50 m nördlich der Mitte von Feld 45 (`hordeBase` in `main.js`), von der Dorfstraße aus etwa 220 m nach Süden durch den Wald. Die Zombies sind 2,4 m groß (`ZOMBIE_SCALE` in `js/zombies.js`), Modelle und Anzahl siehe unten.
 - Zombies haben **Lebenspunkte** (`hp` in `js/zombies.js`: 20). Jeder Treffer zieht den Schaden der Waffe ab (Schwert 10, Axt 14, Bogen 8, Stab 12, Armbrust 11, Faust 2, dazu der Schaden-Skill). Wer mindestens so viel Schaden macht wie der Zombie HP hat, besiegt ihn mit **einem** Treffer.
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
@@ -68,7 +68,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Aufstieg von Level n auf n+1 braucht `KILLS_PER_LEVEL * n` Kills in diesem Level: 100, 200, 300 ... 900 (zusammen 4500 Kills bis Level 10). Beim Aufstieg ist man wieder voll geheilt.
 - Die Werte stehen in `js/stats.js` (`PlayerStats`, mit `damage()`/`heal()` für später) und im Spielstand.
 - **Zombies schlagen zu**, wenn sie nah genug sind: alle 1,4 s, 4 Schaden (`damage` in `js/zombies.js`, `HIT_INTERVAL` in `js/enemies.js`). Rotes Aufblitzen am Bildrand bei Treffern.
-- **0 HP**: Du landest voll geheilt am Startpunkt, der Zombie-Haufen steht wieder an seinem Platz. Level, Kills und Skills bleiben.
+- **0 HP**: Du landest voll geheilt im Dorf (Startpunkt), der Zombie-Haufen steht wieder an seinem Platz. Level, Kills und Skills bleiben.
 
 ## Skills (Taste **K** oder ⭐-Knopf)
 - Du wählst einen von 4 Skills aus: **Schaden, Lebenspunkte, Verteidigung, Resistenz**. Ab dann zählt jeder Kill für den gewählten Skill: alle 100 Kills steigt er um 1 Level (+1 %), höchstens Level 15 (= 15 %). Jeder Skill merkt sich seinen eigenen Fortschritt, beim Wechseln geht nichts verloren. Ist ein Skill voll, wählst du den nächsten.
@@ -79,7 +79,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 ## Wald (Feld 45)
 - `js/forest.js`: Nur Feld 45 ist ein dichter Wald (ca. 2700 Bäume, Raster 5 m, davon 20 % weggelassen: `TREE_SKIP`) mit viel Gras (16000 Büschel). Modelle: `assets/forest/` (Free Forest Nature Pack).
 - Ein 9 m breiter Weg führt quer durch Feld 45 von Feld 35 (Norden) nach Feld 55 (Süden), siehe `paths` in `createForest`.
-- Vom Startpunkt führt ein 9 m breiter Weg (fast ohne Gras) 50 m nach Norden zu einer runden Lichtung (19 m Radius) mit dem Zombie-Haufen (für die 150 Zombies), links und rechts davon ist Wald (`createForest`-Aufruf in `main.js`: `pathW`, `startR`, `hordeR`). Dichte und Menge einstellbar oben in `forest.js` (`TREE_SPACING`, `GRASS_COUNT`, `GRASS_VIEW`).
+- Von der Mitte des Felds 45 führt ein 9 m breiter Weg (fast ohne Gras) 50 m nach Norden zu einer runden Lichtung (19 m Radius) mit dem Zombie-Haufen (für die 150 Zombies), links und rechts davon ist Wald (`createForest`-Aufruf in `main.js`: `pathW`, `startR`, `hordeR`). Dichte und Menge einstellbar oben in `forest.js` (`TREE_SPACING`, `GRASS_COUNT`, `GRASS_VIEW`).
 - Baumstämme sind für den Spieler fest (`collide`). Gezeichnet wird per InstancedMesh in Blöcken, Gras nur im Umkreis von 100 m.
 
 ## Dorf (Feld 35)
@@ -94,3 +94,8 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
   - Kaufen: **100 rote Tränke = 50 Credits** (`POTION_PACK`, `POTION_BUY_PRICE`).
   - Verkaufen: 100 Tränke = 25 Credits (halber Preis, `POTION_SELL_PRICE`).
 - **Trank trinken:** Taste **1**, Klick auf die Trank-Anzeige oben links oder (Handy) Trank-Slot 1. Ein Trank heilt 30 % der max. HP, mindestens 30 (`POTION_HEAL_PCT`). Bei vollen HP wird keiner verbraucht.
+
+## Startpunkt
+- Ein neues Spiel beginnt im **Dorf** (Feld 35): auf der Dorfstraße direkt vor dem Dorfplatz, mit Blick nach Norden zu Brunnen und Händler (`VILLAGE_START` in `js/village.js`). Auch nach dem Tod (0 HP) wirst du dort wiederbelebt.
+- Der Zombie-Haufen steht weiter in der Waldlichtung in Feld 45. Von der Dorfstraße führt der Weg nach Süden (Dorfeingang, durch Feld 45) dorthin.
+- Ein geladener Spielstand beginnt wie gewohnt an der gespeicherten Stelle.

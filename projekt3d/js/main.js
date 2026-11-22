@@ -8,7 +8,7 @@ import {
 import { generateFieldBiomes, buildSplat, countBiomes, findSpawnField, fieldCenter, fieldNumber, fieldRowCol } from './mapgen.js';
 import { loadAssets } from './characters.js';
 import { loadForest, createForest } from './forest.js';
-import { loadVillage, createVillage, MERCHANT_SPOT } from './village.js';
+import { loadVillage, createVillage, MERCHANT_SPOT, VILLAGE_START } from './village.js';
 import { loadNpc, createNpc } from './npc.js';
 import { POTION_PACK, POTION_BUY_PRICE, POTION_SELL_PRICE, POTION_HEAL_PCT } from './config.js';
 import { Game } from './game.js';
@@ -60,7 +60,8 @@ $('cntSnow').textContent = `${counts[BIOME.SNOW]} Felder (${BIOME_SHARE.snow} %)
 
 const mapView = new MapView(splat);
 const game = new Game(renderer, biomes, splat);
-game.startPoint = fieldCenter(findSpawnField(biomes));   // Startpunkt = Mitte des Startfelds (Feld 45)
+game.hordeBase = fieldCenter(findSpawnField(biomes));   // Bezugspunkt für Zombie-Haufen und Waldweg = Mitte von Feld 45 (der Haufen steht 50 m nördlich davon)
+game.startPoint = { x: VILLAGE_START.x, z: VILLAGE_START.z };   // Startpunkt des Spielers: im Dorf (Feld 35)
 
 // Menühintergrund kreist um die Schneefelder, dort treffen alle drei Böden aufeinander
 {
@@ -150,8 +151,7 @@ $('btnPrev').onclick = () => select.prev();
 $('btnNext').onclick = () => select.next();
 $('btnSelectBack').onclick = () => { state = 'menu'; refreshMenu(); showOnly('mainMenu'); };
 $('btnSelectStart').onclick = () => {
-  const spawn = fieldCenter(findSpawnField(biomes));
-  const data = { characterId: select.selected.id, x: spawn.x, z: spawn.z, yaw: Math.PI };
+  const data = { characterId: select.selected.id, x: VILLAGE_START.x, z: VILLAGE_START.z, yaw: VILLAGE_START.yaw };
   startGame(data);
   saveNow(false);
 };
@@ -539,7 +539,7 @@ async function init() {
     $('loadingBar').style.width = `${Math.round(p * 100)}%`;
   });
   // Wald in Feld 45: Weg vom Startpunkt zur Lichtung mit dem Zombie-Haufen (50 m nördlich), links und rechts Wald
-  const sp = game.startPoint;
+  const sp = game.hordeBase;
   game.setForest(createForest(await loadForest(), { start: sp, horde: { x: sp.x, z: sp.z - 50 }, pathW: 9, startR: 7, hordeR: 19 }));
   // Dorf in Feld 35 (Straße führt nach Süden in den Wald von Feld 45)
   game.setVillage(createVillage(await loadVillage()));
