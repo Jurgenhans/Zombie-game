@@ -87,6 +87,13 @@ export class Game {
     this._bindInput();
   }
 
+  // Wald (js/forest.js) in die Welt einsetzen
+  setForest(forest) {
+    if (this.forest) this.scene.remove(this.forest.group);
+    this.forest = forest;
+    this.scene.add(forest.group);
+  }
+
   // ---- Menühintergrund: Kamera kreist über der Karte -------------------------------
   setBackdropCenter(x, z) { this.backdropCenter = { x, z }; }
 
@@ -251,6 +258,7 @@ export class Game {
 
   // ---- Update ----------------------------------------------------------------------
   update(dt) {
+    this.forest?.update(this.camera.position.x, this.camera.position.z);   // Gras nur in der Nähe zeichnen
     if (this.mode === 'backdrop') { this._updateBackdrop(dt); return; }
     this._updatePlay(dt);
   }
@@ -302,6 +310,7 @@ export class Game {
       const speed = (run ? RUN_SPEED : WALK_SPEED * (joy ? Math.max(0.35, mag / TOUCH.RUN_AT) : 1)) * (attacking ? 0.5 : 1);
       this.player.x = Math.min(MAP_SIZE - EDGE, Math.max(EDGE, this.player.x + dx * speed * dt));
       this.player.z = Math.min(MAP_SIZE - EDGE, Math.max(EDGE, this.player.z + dz * speed * dt));
+      if (this.forest) { const p = this.forest.collide(this.player.x, this.player.z); this.player.x = p.x; this.player.z = p.z; }   // Baumstämme sind fest
       // Figur dreht sich weich in Laufrichtung (Modelle blicken nach +Z)
       const target = Math.atan2(dx, dz);
       let diff = target - this.player.yaw;

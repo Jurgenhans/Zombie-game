@@ -7,6 +7,7 @@ import {
 } from './config.js';
 import { generateFieldBiomes, buildSplat, countBiomes, findSpawnField, fieldCenter, fieldNumber, fieldRowCol } from './mapgen.js';
 import { loadAssets } from './characters.js';
+import { loadForest, createForest } from './forest.js';
 import { Game } from './game.js';
 import { CharacterSelect } from './select.js';
 import { MapView } from './minimap.js';
@@ -440,6 +441,9 @@ async function init() {
   await loadAssets((p) => {
     $('loadingBar').style.width = `${Math.round(p * 100)}%`;
   });
+  // Wald in Feld 45: Weg vom Startpunkt zur Lichtung mit dem Zombie-Haufen (50 m nördlich), links und rechts Wald
+  const sp = game.startPoint;
+  game.setForest(createForest(await loadForest(), { start: sp, horde: { x: sp.x, z: sp.z - 50 }, pathW: 9, startR: 7, hordeR: 15 }));
   select = new CharacterSelect(renderer);
   select.onChange = updateCharInfo;
   select.resize();

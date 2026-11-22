@@ -75,3 +75,8 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Der gewählte Skill mit Fortschritt steht unter dem Lebensbalken.
 - Einstellungen: `SKILL_KILLS`, `SKILL_STEP`, `SKILL_MAX` in `js/config.js`; Logik in `js/stats.js` (`select`, `addKill`, `bonus`).
 - Wirkung: Lebenspunkte erhöhen die maximalen HP, Verteidigung senkt Zombie-Schaden, Schaden wird auf den Waffenschaden aufgeschlagen. **Resistenz** hat noch keine Wirkung, weil es noch keine Magie- oder Gift-Angriffe gibt.
+
+## Wald (Feld 45)
+- `js/forest.js`: Nur Feld 45 ist ein dichter Wald (ca. 3300 Bäume, Abstand 5 m) mit viel Gras (16000 Büschel). Modelle: `assets/forest/` (Free Forest Nature Pack).
+- Vom Startpunkt führt ein 9 m breiter Weg (fast ohne Gras) 50 m nach Norden zu einer runden Lichtung (15 m Radius) mit dem Zombie-Haufen, links und rechts davon ist Wald (`createForest`-Aufruf in `main.js`: `pathW`, `startR`, `hordeR`). Dichte und Menge einstellbar oben in `forest.js` (`TREE_SPACING`, `GRASS_COUNT`, `GRASS_VIEW`).
+- Baumstämme sind für den Spieler fest (`collide`). Gezeichnet wird per InstancedMesh in Blöcken, Gras nur im Umkreis von 100 m.
