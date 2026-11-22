@@ -36,6 +36,9 @@ export const CHARACTERS = [
 export const WALK_SPEED = 5;
 export const RUN_SPEED = 14;
 
+// Angriffstempo für alle Waffen und die Faust (1 = Grundtempo, 1.5 = 50 % schneller)
+export const ATTACK_SPEED_MULT = 1.5;
+
 // Touch-Steuerung (Android)
 export const TOUCH = {
   JOY_ZONE: 0.45,   // linke 45 % des Bildschirms: Joystick, der Rest: Kamera

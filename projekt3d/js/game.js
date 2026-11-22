@@ -1,7 +1,7 @@
 // Die Spielwelt: Boden, Himmel, Spielerfigur, Kamera, Steuerung.
 
 import * as THREE from 'three';
-import { MAP_SIZE, FIELD_SIZE, WALK_SPEED, RUN_SPEED, BIOME_NAMES, TOUCH } from './config.js';
+import { MAP_SIZE, FIELD_SIZE, WALK_SPEED, RUN_SPEED, BIOME_NAMES, TOUCH, ATTACK_SPEED_MULT } from './config.js';
 import { createTerrain, createSky, SKY_HORIZON, FOG_NEAR, FOG_FAR } from './terrain.js';
 import { fieldAtWorld, fieldCenter, fieldRowCol, fieldNumber } from './mapgen.js';
 import { createActor } from './characters.js';
@@ -127,7 +127,7 @@ export class Game {
     if (this.mode !== 'play' || this.paused || !this.actor || this.attackT >= 0) return false;
     const w = ITEMS[this.inventory?.equip.weapon] ?? null;
     // Nahkampf/Faust: "Throw"; Bogen, Armbrust und Stab haben eine eigene zweite Animation (items.js: anim)
-    this.attackDur = this.actor.playOnce(w?.anim ?? 'Throw', { speed: w ? (w.attackSpeed ?? 1.7) : 2.3 });
+    this.attackDur = this.actor.playOnce(w?.anim ?? 'Throw', { speed: (w ? (w.attackSpeed ?? 1.7) : 2.3) * ATTACK_SPEED_MULT });
     this.attackT = 0;
     // Zielhilfe: zum nächsten Zombie im Blickfeld der Kamera drehen, sonst in Kamerarichtung
     const cx = -Math.sin(this.cam.yaw), cz = -Math.cos(this.cam.yaw);
