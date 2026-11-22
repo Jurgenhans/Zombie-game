@@ -8,7 +8,8 @@ const AGGRO = 18;      // ab dieser Entfernung (m) bemerken sie den Spieler
 const LOSE = 35;       // ab dieser Entfernung geben sie auf
 const REACH = 1.5 * ZOMBIE_SCALE;     // so nah gehen sie heran
 const HIT_INTERVAL = 1.4;   // Sekunden zwischen zwei Zombie-Schlägen (Schaden pro Typ: damage in zombies.js)
-const MAP_ZOMBIES = 40;   // so viele der neuen Zombie-Typen (3 selbstgebaute + 10 aus dem Set) stehen verteilt auf der Karte (je Feld höchstens einer)
+const MAP_ZOMBIES = 60;   // so viele der neuen Zombie-Typen (3 selbstgebaute + 50 aus dem Set) stehen verteilt auf der Karte (je Feld höchstens einer, höchstens 99)
+const HORDE_SET = 10;     // so viele Modelle aus dem Zombie-Set stehen zusätzlich im Haufen am Start
 const VIEW_DIST = 350;    // ruhende Zombies weiter weg werden nicht gezeichnet und nicht animiert (spart Leistung)
 const RESPAWN = 20;    // Sekunden, bis ein besiegter Zombie wieder aufsteht (zum Testen)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -87,9 +88,8 @@ export class EnemyManager {
 
   // Die ganze Zombie-Welt: der Haufen am Start (mit den 3 neuen Typen mittendrin) und die verteilten Zombies
   spawnWorld(start) {
-    const extra = [...NEW_ZOMBIE_KINDS, ...SET_ZOMBIE_KINDS];     // 3 selbstgebaute + 10 aus dem Zombie-Set
-    this.spawnHorde(start, 10, 50, -Math.PI / 2, extra);
-    this.spawnScattered(MAP_ZOMBIES, extra, start);
+    this.spawnHorde(start, 10, 50, -Math.PI / 2, [...NEW_ZOMBIE_KINDS, ...SET_ZOMBIE_KINDS.slice(0, HORDE_SET)]);
+    this.spawnScattered(MAP_ZOMBIES, [...NEW_ZOMBIE_KINDS, ...SET_ZOMBIE_KINDS], start);   // alle 53 Typen kommen auf der Karte vor
   }
 
   // Alle Zombies zurück an ihren Platz (volle HP), ohne die Modelle neu zu bauen
