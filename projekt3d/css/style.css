@@ -114,10 +114,20 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0e0c09; col
 #hudHelp { left: 14px; bottom: 14px; font-size: 0.8rem; line-height: 1.6; color: var(--dim); }
 #hudHelp b { color: var(--text); }
 .toast {
-  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
   background: rgba(18, 14, 9, 0.9); border: 1px solid var(--gold); border-radius: 999px;
   padding: 0.5rem 1.2rem; font-weight: 600;
 }
+.hud-health {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(420px, 44vw);
+  pointer-events: none;
+}
+.hh-top { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; text-shadow: 0 1px 4px #000; margin-bottom: 3px; }
+#hhLevel { color: var(--gold); font-family: var(--serif); }
+#hhKills { color: var(--dim); }
+.hh-bar { position: relative; height: 22px; background: rgba(18, 14, 9, 0.8); border: 1px solid rgba(255, 200, 60, 0.4); border-radius: 999px; overflow: hidden; }
+.hh-fill { height: 100%; width: 100%; background: linear-gradient(#e8503a, #a8281a); transition: width .2s; }
+.hh-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; text-shadow: 0 1px 3px #000; }
 #miniWrap { position: absolute; right: 14px; bottom: 14px; cursor: pointer; border-radius: 6px; line-height: 0; }
 #miniMap { display: block; border-radius: 4px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55); transition: transform .12s; }
 #miniWrap:hover #miniMap { transform: scale(1.02); }
@@ -166,6 +176,9 @@ body.touch #miniWrap { left: calc(14px + env(safe-area-inset-left)); right: auto
 body.touch #hudInfo { left: calc(var(--mini, 100px) + 28px + env(safe-area-inset-left)); top: 14px; padding: 0.35rem 0.7rem; }
 body.touch .hud-field { font-size: 1.05rem; }
 body.touch #hudToast, body.touch .toast { top: 70px; }
+body.touch .hud-health { width: clamp(180px, 34vw, 320px); top: 8px; }
+body.touch .hh-bar { height: 18px; }
+body.touch .hh-top, body.touch .hh-text { font-size: 0.7rem; }
 
 #touchBtns { position: absolute; top: 14px; right: calc(14px + env(safe-area-inset-right)); display: flex; gap: 8px; }
 body.touch #hud #touchBtns { display: flex; }

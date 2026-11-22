@@ -34,6 +34,7 @@ export class EnemyManager {
     this.scene = scene;
     this.list = [];
     this.shots = [];
+    this.onKill = null;   // wird aufgerufen, wenn ein Zombie besiegt wurde
   }
 
   // count Zombies als dichter Haufen, dessen Mitte `radius` m vom Startpunkt entfernt liegt
@@ -96,6 +97,7 @@ export class EnemyManager {
     if (e.hp <= 0) {
       e.hp = 0; e.state = 'dead'; e.deathT = 0;
       e.bg.visible = e.fill.visible = false;
+      this.onKill?.(e);
       return;
     }
     if (e.state === 'idle' || e.state === 'return') e.state = 'chase';

@@ -7,6 +7,7 @@ import { fieldAtWorld, fieldCenter, fieldRowCol, fieldNumber } from './mapgen.js
 import { createActor } from './characters.js';
 import { ITEMS } from './items.js';
 import { EnemyManager } from './enemies.js';
+import { PlayerStats } from './stats.js';
 
 const EDGE = 1.5; // Abstand zum Kartenrand
 
@@ -62,6 +63,10 @@ export class Game {
     this.cam = { yaw: 0, pitch: 0.35, dist: 6.5 };
     this.keys = new Set();
     this.enemies = new EnemyManager(this.scene);
+    this.stats = new PlayerStats();     // Level, HP, Kills
+    this.enemies.onKill = () => {
+      if (this.stats.addKill()) window.dispatchEvent(new CustomEvent('levelup', { detail: { level: this.stats.level, maxHp: this.stats.maxHp } }));
+    };
     this.startPoint = null;             // Startpunkt der Welt (von main.js gesetzt)
     this.pending = null;                // Treffer, der in der Mitte des Schlags ausgelöst wird
     this.inventory = null;              // wird von main.js gesetzt
@@ -79,7 +84,8 @@ export class Game {
   setBackdropCenter(x, z) { this.backdropCenter = { x, z }; }
 
   // ---- Spiel starten ---------------------------------------------------------------
-  startPlay({ characterId, x, z, yaw = 0, activeField }) {
+  startPlay({ characterId, x, z, yaw = 0, activeField, stats }) {
+    this.stats.load(stats);
     if (this.actor) { this.scene.remove(this.actor.group); this.actor = null; }
     this.actor = createActor(characterId);
     this.actorId = characterId;
@@ -162,6 +168,7 @@ export class Game {
     return {
       characterId: this.actorId, x: this.player.x, z: this.player.z, yaw: this.player.yaw, activeField: this.activeField,
       inventory: this.inventory ? this.inventory.toJSON() : undefined,
+      stats: this.stats.toJSON(),
     };
   }
 

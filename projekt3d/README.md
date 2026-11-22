@@ -54,3 +54,11 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
 - Anzahl, Abstand und Richtung des Haufens: `spawnHorde(...)` in `js/game.js`.
+
+## Level und Lebensbalken
+- Oben in der Mitte: Level, Lebensbalken (HP) und Kills bis zum nächsten Level.
+- Level 1 hat 100 HP, Level 2 hat 200 HP ... Level 10 hat 1000 HP (`HP_PER_LEVEL`, `MAX_LEVEL` in `js/config.js`).
+- Aufstieg von Level n auf n+1 braucht `KILLS_PER_LEVEL * n` Kills in diesem Level: 100, 200, 300 ... 900 (zusammen 4500 Kills bis Level 10). Beim Aufstieg ist man wieder voll geheilt.
+- Die Werte stehen in `js/stats.js` (`PlayerStats`, mit `damage()`/`heal()` für später) und im Spielstand.
+- Noch nicht eingebaut: Zombies verletzen den Spieler (der Balken sinkt also noch nicht).
+

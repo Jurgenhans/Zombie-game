@@ -48,6 +48,11 @@ export const TOUCH = {
   LOOK_Y: 0.005,    // Kamera-Empfindlichkeit senkrecht
 };
 
+// Level und Lebenspunkte: Level n hat HP_PER_LEVEL * n HP; Aufstieg von Level n braucht KILLS_PER_LEVEL * n Kills.
+export const MAX_LEVEL = 10;
+export const HP_PER_LEVEL = 100;
+export const KILLS_PER_LEVEL = 100;
+
 // Inventar: Anzahl Felder (Spalten x Reihen). Im Querformat am Handy passen 10 x 6 am besten.
 export const INV_COLS = 10;
 export const INV_ROWS = 6;

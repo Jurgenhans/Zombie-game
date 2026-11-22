@@ -129,7 +129,7 @@ $('btnLoad').onclick = () => {
   if (!save) return;
   startGame({
     characterId: CHARACTERS.some((c) => c.id === save.characterId) ? save.characterId : CHARACTERS[0].id,
-    x: save.x, z: save.z, yaw: save.yaw ?? 0, activeField: save.activeField, inventory: save.inventory,
+    x: save.x, z: save.z, yaw: save.yaw ?? 0, activeField: save.activeField, inventory: save.inventory, stats: save.stats,
   });
 };
 
@@ -161,6 +161,7 @@ function startGame(data) {
   showOnly();
   show('hud');
   fitMaps();
+  updateHealthBar();
   miniTimer = 0;
   autosaveTimer = 0;
 }
@@ -337,6 +338,20 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('beforeunload', () => { if (state === 'game') saveNow(false); });
 
 // ---------- HUD --------------------------------------------------------------------
+// Lebensbalken oben in der Mitte: Level, HP und Kills bis zum nächsten Level
+function updateHealthBar() {
+  const s = game.stats;
+  $('hhLevel').textContent = `Level ${s.level}`;
+  $('hhKills').textContent = s.isMaxLevel ? `${s.total} Kills · Max` : `${s.kills} / ${s.needed} Kills`;
+  $('hhText').textContent = `${Math.ceil(s.hp)} / ${s.maxHp} HP`;
+  $('hhFill').style.width = `${Math.max(0, Math.min(100, (s.hp / s.maxHp) * 100))}%`;
+}
+window.addEventListener('levelup', (e) => {
+  updateHealthBar();
+  toast(`Level ${e.detail.level}! Jetzt ${e.detail.maxHp} HP`);
+  if (state === 'game') saveNow(false);
+});
+
 function updateHud(dt) {
   hudTimer -= dt; miniTimer -= dt; autosaveTimer += dt;
   if (hudTimer <= 0) {
@@ -344,6 +359,7 @@ function updateHud(dt) {
     $('hudField').textContent = `Feld ${game.currentFieldNumber}`;
     $('hudBiome').textContent = game.currentBiomeName + (game.currentField === game.activeField ? ' · aktives Feld' : '');
     $('hudPos').textContent = `x ${Math.round(game.player.x)}  z ${Math.round(game.player.z)}`;
+    updateHealthBar();
   }
   if (miniTimer <= 0) { miniTimer = 0.1; drawMaps(); }
   if (autosaveTimer > 20) { autosaveTimer = 0; saveNow(false); }
