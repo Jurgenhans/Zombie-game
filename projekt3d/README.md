@@ -54,11 +54,11 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
 - **Zombie-Set:** Alle Zombies im Spiel sind fertige GLB-Modelle aus `assets/zombies/` (`Zombie_001.glb` bis `Zombie_150.glb`, Typen `set001` bis `set150`). Alle haben dieselben Werte (20 HP, 4 Schaden, gleiche Geschwindigkeit und Größe wie der frühere Schlurfer, gleiches Verhalten).
-  - **Haufen am Start:** 23 Zombies (`HORDE_COUNT` in `js/config.js`), dazu stehen **60 Zombies verteilt auf der Karte** (`MAP_ZOMBIES`; je Feld höchstens einer, nie im Startfeld, feste Plätze).
-  - **Auswahl:** Bei jedem Spielstart werden 83 der 150 Modelle zufällig ausgewählt (jedes höchstens einmal, `ZOMBIE_PICK` in `js/config.js`). Nur diese werden geladen, das spart Ladezeit und Speicher.
+  - **Haufen am Start:** Alle 150 Zombies stehen als Haufen (ca. 16 m Radius) am Start, jedes Modell einmal, in zufälliger Anordnung (`HORDE_COUNT` in `js/config.js`). Zusätzlich auf der Karte verteilte Zombies gibt es derzeit keine (`MAP_ZOMBIES = 0`; ein Wert bis 99 stellt sie wieder ein, je Feld höchstens einer, nie im Startfeld).
+  - **Auswahl:** `ZOMBIE_PICK` in `js/config.js` wählt bei jedem Spielstart aus den 150 Modellen aus. Stellt man `HORDE_COUNT`/`MAP_ZOMBIES` kleiner, werden zufällig weniger Modelle gewählt und nur diese geladen (spart Ladezeit und Speicher).
   - Weit entfernte, ruhende Zombies werden nicht gezeichnet (`VIEW_DIST` in `js/enemies.js`).
   - Die Modelle haben keine Skelette. Beine, Arme, Kopf und Körper werden an der Struktur der Datei erkannt (`createSetZombie` in `js/zombies.js`) und per Code bewegt, als Ausschlag um die Haltung im Modell. Ein neues Modell im selben Aufbau legt man in `assets/zombies/` und trägt es in `ZOMBIE_SET` (`js/config.js`) ein.
-  - Jedes Modell hat ca. 11 000 Dreiecke und 64 Teile. Wenn es auf einem schwachen Handy ruckelt, helfen weniger Zombies (`MAP_ZOMBIES`, `HORDE_COUNT`) oder eine kleinere `VIEW_DIST`.
+  - Jedes Modell hat ca. 11 000 Dreiecke. Beim Laden werden die ca. 67 kleinen Teile je Zombie zu ca. 24 zusammengefasst (`mergeZombieParts` in `js/zombie-parts.js`, sieht genau gleich aus), das spart viele Zeichenaufrufe. Trotzdem sind 150 Zombies zusammen ca. 3 800 Zeichenaufrufe und 1,6 Mio. Dreiecke: Wenn es auf einem schwachen Rechner oder Handy ruckelt, hilft ein kleineres `HORDE_COUNT`.
   - Die früheren selbstgebauten Würfel-Zombies (Schlurfer, Brocken, Soldat, Doktor, Bauarbeiter) werden nicht mehr verwendet. Der Schlurfer bleibt nur im Code als Ersatz, falls eine Datei fehlt.
 - Anzahl, Abstand und Richtung des Haufens: `spawnHorde(...)` in `js/game.js`.
 
@@ -79,7 +79,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 ## Wald (Feld 45)
 - `js/forest.js`: Nur Feld 45 ist ein dichter Wald (ca. 2700 Bäume, Raster 5 m, davon 20 % weggelassen: `TREE_SKIP`) mit viel Gras (16000 Büschel). Modelle: `assets/forest/` (Free Forest Nature Pack).
 - Ein 9 m breiter Weg führt quer durch Feld 45 von Feld 35 (Norden) nach Feld 55 (Süden), siehe `paths` in `createForest`.
-- Vom Startpunkt führt ein 9 m breiter Weg (fast ohne Gras) 50 m nach Norden zu einer runden Lichtung (15 m Radius) mit dem Zombie-Haufen, links und rechts davon ist Wald (`createForest`-Aufruf in `main.js`: `pathW`, `startR`, `hordeR`). Dichte und Menge einstellbar oben in `forest.js` (`TREE_SPACING`, `GRASS_COUNT`, `GRASS_VIEW`).
+- Vom Startpunkt führt ein 9 m breiter Weg (fast ohne Gras) 50 m nach Norden zu einer runden Lichtung (19 m Radius) mit dem Zombie-Haufen (für die 150 Zombies), links und rechts davon ist Wald (`createForest`-Aufruf in `main.js`: `pathW`, `startR`, `hordeR`). Dichte und Menge einstellbar oben in `forest.js` (`TREE_SPACING`, `GRASS_COUNT`, `GRASS_VIEW`).
 - Baumstämme sind für den Spieler fest (`collide`). Gezeichnet wird per InstancedMesh in Blöcken, Gras nur im Umkreis von 100 m.
 
 ## Dorf (Feld 35)

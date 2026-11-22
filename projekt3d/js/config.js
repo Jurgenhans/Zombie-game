@@ -39,8 +39,8 @@ export const ZOMBIE_SET = Array.from({ length: 150 }, (_, i) => {
 });
 
 // So viele Zombies gibt es: ein Haufen am Start und dazu welche verteilt auf der Karte (je Feld höchstens einer, also höchstens 99)
-export const HORDE_COUNT = 23;
-export const MAP_ZOMBIES = 60;
+export const HORDE_COUNT = 150;   // alle Modelle stehen im Haufen am Start
+export const MAP_ZOMBIES = 0;     // zusätzlich verteilt auf der Karte (0 = keine)
 // Bei jedem Spielstart eine andere Auswahl aus dem Set (jedes Modell höchstens einmal): zuerst der Haufen, dann die verteilten.
 // Nur diese Modelle werden geladen (spart Ladezeit und Speicher).
 export const ZOMBIE_PICK = (() => {

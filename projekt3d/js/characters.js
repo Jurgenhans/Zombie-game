@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CHARACTERS, ZOMBIE_SET, ZOMBIE_PICK } from './config.js';
 import { createWeaponMesh, WEAPON_STYLE } from './weapons.js';
+import { mergeZombieParts } from './zombie-parts.js';
 
 const loader = new GLTFLoader();
 export const assets = { models: {}, clips: {}, zombies: {} };
@@ -23,6 +24,7 @@ export async function loadAssets(onProgress) {
       assets.models[job.id] = gltf.scene;
     } else if (job.kind === 'zombie') {
       gltf.scene.traverse((o) => { if (o.isMesh) o.geometry.userData.keep = true; });   // gemeinsam genutzt: nicht freigeben
+      try { mergeZombieParts(gltf.scene); } catch (e) { console.warn(`Zombie ${job.id}: Teile nicht zusammengefasst`, e); }   // ca. 67 -> 24 Teile je Zombie
       assets.zombies[job.id] = gltf.scene;
     } else {
       for (const clip of gltf.animations) if (clip.name !== 'T-Pose') assets.clips[clip.name] = clip;

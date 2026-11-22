@@ -540,7 +540,7 @@ async function init() {
   });
   // Wald in Feld 45: Weg vom Startpunkt zur Lichtung mit dem Zombie-Haufen (50 m nördlich), links und rechts Wald
   const sp = game.startPoint;
-  game.setForest(createForest(await loadForest(), { start: sp, horde: { x: sp.x, z: sp.z - 50 }, pathW: 9, startR: 7, hordeR: 15 }));
+  game.setForest(createForest(await loadForest(), { start: sp, horde: { x: sp.x, z: sp.z - 50 }, pathW: 9, startR: 7, hordeR: 19 }));
   // Dorf in Feld 35 (Straße führt nach Süden in den Wald von Feld 45)
   game.setVillage(createVillage(await loadVillage()));
   await loadNpc();                                  // Händler: Zombie ohne Rot, steht am Dorfplatz

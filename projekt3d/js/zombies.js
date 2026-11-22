@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { ZOMBIE_SET } from './config.js';
 import { assets } from './characters.js';
+import { findParts } from './zombie-parts.js';
 
 export const ZOMBIE_SCALE = 1.3;   // Größe der Zombies (1.3 = 30 % größer)
 
@@ -79,23 +80,15 @@ function createSetZombie(typeId) {
   if (!src) return fail('Modell nicht geladen');
 
   const root = src.clone(true);
-  let fig = root;
-  while (fig.children.length === 1 && !fig.children[0].isMesh) fig = fig.children[0];
-  const groups = fig.children.filter((c) => !c.isMesh);
-  const legs = groups.filter((c) => Math.abs(c.position.x) > 0.05);
-  const bodyN = groups.find((c) => Math.abs(c.position.x) <= 0.05);
-  if (legs.length !== 2 || !bodyN) return fail('Körperbau nicht erkannt');
-  const sub = bodyN.children.filter((c) => !c.isMesh);
-  const arms = sub.filter((c) => Math.abs(c.position.x) > 0.1);
-  const headN = sub.find((c) => Math.abs(c.position.x) <= 0.1);
-  if (arms.length !== 2 || !headN) return fail('Arme/Kopf nicht erkannt');
+  const parts = findParts(root);
+  if (parts.error) return fail(parts.error);
+  const { legs, bodyN, arms, headN } = parts;
 
   // Eigene Materialien je Zombie (für den Treffer-Blitz); Texturen bleiben gemeinsam
   // (Teile mit demselben Material teilen sich auch das Klon-Material: ca. 15 statt 60 Materialien je Zombie)
   const mats = [], copies = new Map();
   root.traverse((o) => {
     if (!o.isMesh) return;
-    o.frustumCulled = false;
     let m = copies.get(o.material);
     if (!m) {
       m = o.material.clone();
@@ -123,7 +116,7 @@ function createSetZombie(typeId) {
   const g = new THREE.Group();
   g.add(inner);
   g.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(g);
+  const box = new THREE.Box3().setFromObject(g, true);   // genau (aus den Punkten), nicht aus den groben Umrissen
   const h = box.max.y - box.min.y;
   if (!(h > 0.5 && h < 10)) return fail('Größe nicht lesbar');
   inner.position.y = -box.min.y;
