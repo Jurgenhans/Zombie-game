@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import {
-  CHARACTERS, FIELD_SIZE, MAP_SIZE, BIOME, BIOME_NAMES, BIOME_SHARE, SKILL_MAX,
+  CHARACTERS, FIELD_SIZE, MAP_SIZE, BIOME, BIOME_NAMES, BIOME_SHARE, SKILL_MAX, SKILL_KILLS,
 } from './config.js';
 import { generateFieldBiomes, buildSplat, countBiomes, findSpawnField, fieldCenter, fieldNumber, fieldRowCol } from './mapgen.js';
 import { loadAssets } from './characters.js';
@@ -287,19 +287,19 @@ big.addEventListener('dblclick', (e) => {
   if (f >= 0) { selectedField = f; goToSelectedField(); }
 });
 
-// Skills: alle 100 Kills ein Punkt, den man auf einen der Skills legt
+// Skills: einen Skill auswählen, ab dann zählen alle Kills für ihn (alle 100 Kills +1 %, bis Level 15)
 let skillsOpen = false;
 function renderSkills() {
-  const s = game.stats;
-  $('skInfo').innerHTML = `Freie Skillpunkte: <b>${s.pointsFree}</b> · ` +
-    (s.killsToPoint ? `nächster Punkt in ${s.killsToPoint} Kills` : 'alle Skills voll') + ` · Kills gesamt: ${s.total}`;
+  const s = game.stats, sel = SKILLS[s.selected];
+  $('skInfo').innerHTML = `Tippe einen Skill an: Jeder Kill zählt für den gewählten Skill, alle ${SKILL_KILLS} Kills gibt es +1 % (bis Level ${SKILL_MAX}).<br>` +
+    `Aktiv: <b>${sel.icon} ${sel.label}</b> · Kills gesamt: ${s.total}`;
   $('skRows').innerHTML = SKILL_KEYS.map((k) => {
-    const lv = s.skills[k], def = SKILLS[k];
-    const pips = Array.from({ length: SKILL_MAX }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
-    return `<div class="sk-row"><div class="sk-icon">${def.icon}</div>` +
+    const lv = s.skills[k], def = SKILLS[k], full = lv >= SKILL_MAX, isSel = k === s.selected;
+    return `<button class="sk-row${isSel ? ' sel' : ''}" data-skill="${k}" aria-pressed="${isSel}">` +
+      `<div class="sk-icon">${def.icon}</div>` +
       `<div><span class="sk-name">${def.label}<small>Level ${lv} / ${SKILL_MAX} · +${lv} %</small></span><div class="sk-desc">${def.desc}</div></div>` +
-      `<button class="sk-plus" data-skill="${k}" aria-label="${def.label} verbessern"${s.pointsFree > 0 && lv < SKILL_MAX ? '' : ' disabled'}>+</button>` +
-      `<div class="sk-pips">${pips}</div></div>`;
+      `<div class="sk-state">${isSel ? '● Aktiv' : 'Wählen'}</div>` +
+      `<div class="sk-prog"><div class="bar"><i style="width:${full ? 100 : (s.skillKills[k] / SKILL_KILLS) * 100}%"></i></div>${full ? 'voll' : `${s.skillKills[k]} / ${SKILL_KILLS} Kills`}</div></button>`;
   }).join('');
 }
 function openSkills() {
@@ -320,7 +320,7 @@ $('btnSkillsClose').onclick = closeSkills;
 $('skRows').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-skill]');
   if (!b) return;
-  if (game.stats.spend(b.dataset.skill)) { renderSkills(); saveNow(false); }
+  if (game.stats.select(b.dataset.skill)) { renderSkills(); updateHealthBar(); saveNow(false); }
 });
 
 // Pause
@@ -386,20 +386,24 @@ function updateHealthBar() {
   $('hhKills').textContent = s.isMaxLevel ? `${s.total} Kills · Max` : `${s.kills} / ${s.needed} Kills`;
   $('hhText').textContent = `${Math.ceil(s.hp)} / ${s.maxHp} HP`;
   $('hhFill').style.width = `${Math.max(0, Math.min(100, (s.hp / s.maxHp) * 100))}%`;
-  const badge = $('skBadge');
-  badge.textContent = s.pointsFree;
-  badge.classList.toggle('hidden', s.pointsFree <= 0);
+  const k = s.selected, def = SKILLS[k], lv = s.skills[k];
+  $('hhSkill').textContent = `${def.icon} ${def.label} · Level ${lv}` + (lv >= SKILL_MAX ? ' (voll)' : ` · ${s.skillKills[k]} / ${SKILL_KILLS}`);
 }
-window.addEventListener('skillpoint', () => { updateHealthBar(); toast('Neuer Skillpunkt! (Taste K / ⭐)'); });
 window.addEventListener('playerhurt', () => {
   updateHealthBar();
   const f = $('hurtFlash');
   f.classList.remove('hit'); void f.offsetWidth; f.classList.add('hit');
 });
 window.addEventListener('playerdied', () => { updateHealthBar(); toast('Du wurdest besiegt – zurück am Startpunkt'); });
-window.addEventListener('levelup', (e) => {
+window.addEventListener('progress', (e) => {
+  const d = e.detail, parts = [];
+  if (d.levelUp) parts.push(`Level ${d.level}! Jetzt ${d.maxHp} HP`);
+  if (d.skillUp) {
+    const def = SKILLS[d.skillUp];
+    parts.push(d.skillMaxed ? `${def.label} voll (+${SKILL_MAX} %) – wähle in ⭐ den nächsten Skill` : `${def.label} Level ${d.skillLevel} (+${d.skillLevel} %)`);
+  }
   updateHealthBar();
-  toast(`Level ${e.detail.level}! Jetzt ${e.detail.maxHp} HP` + (e.detail.skillPoint ? ' · Neuer Skillpunkt!' : ''));
+  toast(parts.join(' · '));
   if (state === 'game') saveNow(false);
 });
 

@@ -64,7 +64,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - **0 HP**: Du landest voll geheilt am Startpunkt, der Zombie-Haufen steht wieder an seinem Platz. Level, Kills und Skills bleiben.
 
 ## Skills (Taste **K** oder ⭐-Knopf)
-- Alle 100 Kills (gesamt) gibt es 1 Skillpunkt, den du selbst auf einen von 4 Skills legst: **Schaden, Lebenspunkte, Verteidigung, Resistenz**. Jeder Punkt gibt +1 %, jeder Skill hat höchstens Level 15 (= 15 %), zusammen also 60 Punkte (6000 Kills).
-- Einstellungen: `SKILL_KILLS`, `SKILL_STEP`, `SKILL_MAX` in `js/config.js`; Logik in `js/stats.js` (`spend`, `bonus`).
-- Wirkung: Lebenspunkte erhöhen die maximalen HP, Verteidigung senkt Zombie-Schaden, Schaden erhöht den Schadenswert der Waffen. **Resistenz** hat noch keine Wirkung, weil es noch keine Magie- oder Gift-Angriffe gibt.
-
+- Du wählst einen von 4 Skills aus: **Schaden, Lebenspunkte, Verteidigung, Resistenz**. Ab dann zählt jeder Kill für den gewählten Skill: alle 100 Kills steigt er um 1 Level (+1 %), höchstens Level 15 (= 15 %). Jeder Skill merkt sich seinen eigenen Fortschritt, beim Wechseln geht nichts verloren. Ist ein Skill voll, wählst du den nächsten.
+- Der gewählte Skill mit Fortschritt steht unter dem Lebensbalken.
+- Einstellungen: `SKILL_KILLS`, `SKILL_STEP`, `SKILL_MAX` in `js/config.js`; Logik in `js/stats.js` (`select`, `addKill`, `bonus`).
+- Wirkung: Lebenspunkte erhöhen die maximalen HP, Verteidigung senkt Zombie-Schaden, Schaden wird auf den Waffenschaden aufgeschlagen. **Resistenz** hat noch keine Wirkung, weil es noch keine Magie- oder Gift-Angriffe gibt.

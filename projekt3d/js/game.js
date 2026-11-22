@@ -66,11 +66,12 @@ export class Game {
     this.stats = new PlayerStats();     // Level, HP, Kills
     this.pendingDeath = false;
     this.enemies.onKill = () => {
-      const points = this.stats.pointsEarned;
-      const up = this.stats.addKill();
-      const skillPoint = this.stats.pointsEarned > points;
-      if (up) window.dispatchEvent(new CustomEvent('levelup', { detail: { level: this.stats.level, maxHp: this.stats.maxHp, skillPoint } }));
-      else if (skillPoint) window.dispatchEvent(new CustomEvent('skillpoint'));
+      const r = this.stats.addKill();
+      if (r.levelUp || r.skillUp) {
+        window.dispatchEvent(new CustomEvent('progress', { detail: {
+          ...r, level: this.stats.level, maxHp: this.stats.maxHp, skillLevel: r.skillUp ? this.stats.skills[r.skillUp] : 0,
+        } }));
+      }
     };
     this.enemies.onPlayerHit = (dmg) => this._hurt(dmg);
     this.startPoint = null;             // Startpunkt der Welt (von main.js gesetzt)
