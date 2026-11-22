@@ -66,6 +66,7 @@ export class Game {
     this.pending = null;                // Treffer, der in der Mitte des Schlags ausgelöst wird
     this.inventory = null;              // wird von main.js gesetzt
     this.attackT = -1; this.attackDur = 0;
+    this.attackHeld = false;            // Angriffsknopf gedrückt gehalten = Dauerangriff
     this.touchMove = { x: 0, y: 0 };   // Joystick: x = rechts, y = vorwärts (-1..1)
     this.backdropT = 0;
     this.moving = false;
@@ -104,6 +105,7 @@ export class Game {
     this.keys.clear();
     this.touchMove.x = this.touchMove.y = 0;
     this.attackT = -1;
+    this.attackHeld = false;
     this.pending = null;
     this.enemies.clear();
   }
@@ -124,14 +126,15 @@ export class Game {
   attack() {
     if (this.mode !== 'play' || this.paused || !this.actor || this.attackT >= 0) return false;
     const w = ITEMS[this.inventory?.equip.weapon] ?? null;
-    this.attackDur = this.actor.playOnce('Throw', { speed: w ? (w.attackSpeed ?? 1.7) : 2.3 });
+    // Nahkampf/Faust: "Throw"; Bogen, Armbrust und Stab haben eine eigene zweite Animation (items.js: anim)
+    this.attackDur = this.actor.playOnce(w?.anim ?? 'Throw', { speed: w ? (w.attackSpeed ?? 1.7) : 2.3 });
     this.attackT = 0;
     // Zielhilfe: zum nächsten Zombie im Blickfeld der Kamera drehen, sonst in Kamerarichtung
     const cx = -Math.sin(this.cam.yaw), cz = -Math.cos(this.cam.yaw);
     const reach = w && w.kind !== 'melee' ? 35 : (w?.range ?? 1.8) + 3;
     const tgt = this.enemies.nearestInCone(this.player.x, this.player.z, cx, cz, reach, 0.5);
     this.player.yaw = tgt ? Math.atan2(tgt.x - this.player.x, tgt.z - this.player.z) : Math.atan2(cx, cz);
-    this.pending = { at: this.attackDur * 0.55, w };   // Treffer in der Mitte des Schwungs
+    this.pending = { at: this.attackDur * (w?.releaseAt ?? 0.55), w };   // Treffer/Schuss im passenden Moment der Animation
     window.dispatchEvent(new CustomEvent('playerattack', { detail: { weapon: w?.id ?? null, damage: w?.damage ?? 2 } }));
     return true;
   }
@@ -189,7 +192,7 @@ export class Game {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && this.mode === 'play' && !this.paused) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => { this.keys.clear(); this.attackHeld = false; });
     el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;   // Touch macht touch.js
@@ -246,6 +249,8 @@ export class Game {
       if (this.pending && this.attackT >= this.pending.at) { this._release(this.pending.w); this.pending = null; }
       if (this.attackT >= this.attackDur) this.attackT = -1;
     }
+    // Knopf (oder Taste F) gehalten: sobald der Schlag fertig ist, gleich der nächste
+    if (this.attackT < 0 && !this.paused && (this.attackHeld || k.has('KeyF'))) this.attack();
     const attacking = this.attackT >= 0;
     const run = k.has('ShiftLeft') || k.has('ShiftRight') || (joy && mag >= TOUCH.RUN_AT);
     const len = Math.hypot(ix, iz);

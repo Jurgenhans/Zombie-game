@@ -207,7 +207,21 @@ function closeInventory() {
 }
 $('btnInv').onclick = () => { if (invOpen) closeInventory(); else openInventory(); };
 $('btnInvClose').onclick = closeInventory;
-$('btnAttack').addEventListener('pointerdown', (e) => { e.preventDefault(); game.attack(); });
+// Angriffsknopf: gedrückt halten = Dauerangriff, loslassen = Ende
+{
+  const btn = $('btnAttack');
+  const stop = () => { game.attackHeld = false; };
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    btn.setPointerCapture?.(e.pointerId);
+    game.attackHeld = true;
+    game.attack();
+  });
+  btn.addEventListener('pointerup', stop);
+  btn.addEventListener('pointercancel', stop);
+  btn.addEventListener('lostpointercapture', stop);
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
+}
 
 function openBigMap() {
   if (state !== 'game') return;

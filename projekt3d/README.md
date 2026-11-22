@@ -44,9 +44,9 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 ## Inventar und Kampf
 - **Inventar** (🎒-Knopf oben rechts oder Taste **I**): rechts der Rucksack (10 x 6 Felder, einstellbar mit `INV_COLS`/`INV_ROWS` in `config.js`), links die Ausrüstung: Helm, Waffe, Rüstung, Handschuhe, Schuhe, 2 x Implantat.
   Bedienung: Gegenstand antippen = auswählen, dann leeres/anderes Feld = verschieben/tauschen, Ausrüstungsfeld oder Knopf "Ausrüsten"/"Ablegen" = anlegen/ablegen.
-- **Zuschlagen** (roter Knopf oder Taste **F**): mit Waffe wird sie benutzt, sonst Faustschlag. Beim Schlag wird das Ereignis `playerattack` ({weapon, damage}) gesendet.
+- **Zuschlagen** (roter Knopf oder Taste **F**): mit Waffe wird sie benutzt, sonst Faustschlag. **Gedrückt halten = Dauerangriff**, loslassen = Ende (`attackHeld` in `js/game.js`). Beim Schlag wird das Ereignis `playerattack` ({weapon, damage}) gesendet.
 - Testwaffen im Rucksack: Schwert, Axt, Bogen (linke Hand), Magierstab, Armbrust. Neue Gegenstände: `js/items.js` (Daten), Waffenmodelle und Schlag-Haltung in `js/weapons.js`. Das Inventar steht im Spielstand (`js/inventory.js`).
-- Die Schlag-Animation nutzt vorerst "Throw", weil das Paket keine Nahkampf-Animationen enthält.
+- Nahkampf und Faust nutzen die Animation "Throw" (das Paket hat keine Nahkampf-Animationen). Bogen, Armbrust und Stab nutzen die zweite Animation "Use_Item"; sie wird pro Waffe in `js/items.js` mit `anim` gesetzt, der Schuss-Zeitpunkt mit `releaseAt` (0..1).
 
 ## Zombies
 - 10 Zombies stehen als dichter Haufen in Feld 45, dessen Mitte 50 m vom Startpunkt (Mitte von Feld 45) entfernt liegt (geradeaus nach Norden, also in Blickrichtung beim Start). Zwei selbstgebaute Lowpoly-Modelle, 30 % größer als das Grundmodell (`ZOMBIE_SCALE` in `js/zombies.js`): **Schlurfer** und **Brocken**.
