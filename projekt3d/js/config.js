@@ -79,3 +79,13 @@ export const SKILL_STEP = 0.01;
 // Inventar: Anzahl Felder (Spalten x Reihen). Im Querformat am Handy passen 10 x 6 am besten.
 export const INV_COLS = 10;
 export const INV_ROWS = 6;
+
+// Credits und Händler: Ein besiegter Zombie lässt 2 bis 5 Credits fallen (werden automatisch eingesammelt).
+// Der Händler (Zombie-NPC im Dorf, Feld 35) verkauft rote HP-Tränke: 100 Tränke kosten 50 Credits.
+export const CREDITS_DROP_MIN = 2;
+export const CREDITS_DROP_MAX = 5;
+export const POTION_PACK = 100;        // Tränke pro Paket
+export const POTION_BUY_PRICE = 50;    // Credits: 1 Paket (100 Tränke) kaufen
+export const POTION_SELL_PRICE = 25;   // Credits: 1 Paket (100 Tränke) an den Händler verkaufen (die Hälfte)
+export const POTION_HEAL_PCT = 0.3;    // ein Trank heilt 30 % der maximalen HP (mindestens 30 HP)
+export const NPC_TALK_DIST = 3.5;      // so nah (Meter) muss man am Händler stehen, um ihn anzusprechen

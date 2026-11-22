@@ -28,6 +28,7 @@ export class PlayerStats {
     this.skills = zeros();       // Level je Skill (0..SKILL_MAX)
     this.skillKills = zeros();   // Kills auf dem Weg zum nächsten Skill-Level (0..SKILL_KILLS-1)
     this.selected = SKILL_KEYS[0];   // dieser Skill bekommt die Kills
+    this.credits = 0; this.potions = 0;   // Geld und rote HP-Tränke
     this.hp = this.maxHp;
   }
 
@@ -71,7 +72,8 @@ export class PlayerStats {
 
   toJSON() {
     return { level: this.level, kills: this.kills, total: this.total, hp: this.hp,
-      skills: { ...this.skills }, skillKills: { ...this.skillKills }, selected: this.selected };
+      skills: { ...this.skills }, skillKills: { ...this.skillKills }, selected: this.selected,
+      credits: this.credits, potions: this.potions };
   }
 
   load(d) {
@@ -81,6 +83,8 @@ export class PlayerStats {
     this.level = int(d.level, 1, MAX_LEVEL, 1);
     this.kills = this.isMaxLevel ? 0 : int(d.kills, 0, this.needed - 1, 0);
     this.total = int(d.total, 0, Infinity, 0);
+    this.credits = int(d.credits, 0, 1e12, 0);
+    this.potions = int(d.potions, 0, 1e9, 0);
     if (d.selected in SKILLS) this.selected = d.selected;
     for (const k of SKILL_KEYS) {
       this.skills[k] = int(d.skills?.[k], 0, SKILL_MAX, 0);

@@ -11,6 +11,7 @@ const row = Math.floor((FOREST_FIELD - 1) / GRID), col = (FOREST_FIELD - 1) % GR
 const X0 = col * FIELD_SIZE, Z0 = row * FIELD_SIZE;  // Ecke des Feldes (Meter)
 
 const TREE_SPACING = 5.0;   // Meter zwischen den Bäumen (kleiner = dichter)
+const TREE_SKIP = 0.2;      // Anteil Bäume, der weggelassen wird (0.2 = 20 % weniger)
 const GRASS_COUNT = 16000;  // Grasbüschel im ganzen Feld
 const TRUNK_R = 0.6;        // Stamm-Radius für die Kollision
 const TREE_CHUNK = 60, GRASS_CHUNK = 40;
@@ -72,12 +73,21 @@ export function createForest({ trees, grass }, clear) {
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 
   const { start: S, horde: H } = clear;
-  const dx = H.x - S.x, dz = H.z - S.z, len2 = dx * dx + dz * dz || 1;
+  // Wege als Strecken {a, b, w}: Startweg zur Lichtung und der Durchgangsweg von Feld 35 (Norden) nach Feld 55 (Süden)
+  const cx = X0 + FIELD_SIZE / 2;
+  const paths = [
+    { a: S, b: H, w: clear.pathW },
+    { a: { x: cx, z: Z0 }, b: { x: cx, z: Z0 + FIELD_SIZE }, w: clear.pathW },
+  ];
+  const segDist = (p, x, z) => {
+    const dx = p.b.x - p.a.x, dz = p.b.z - p.a.z;
+    const t = Math.max(0, Math.min(1, ((x - p.a.x) * dx + (z - p.a.z) * dz) / (dx * dx + dz * dz || 1)));
+    return Math.hypot(x - (p.a.x + dx * t), z - (p.a.z + dz * t));
+  };
   // 0 = Wald, 1 = Weg, 2 = Lichtung/Startplatz (Bäume stehen nur im Wald)
   const zoneAt = (x, z) => {
     if (Math.hypot(x - H.x, z - H.z) < clear.hordeR || Math.hypot(x - S.x, z - S.z) < clear.startR) return 2;
-    const t = Math.max(0, Math.min(1, ((x - S.x) * dx + (z - S.z) * dz) / len2));
-    return Math.hypot(x - (S.x + dx * t), z - (S.z + dz * t)) < clear.pathW / 2 ? 1 : 0;
+    return paths.some((p) => segDist(p, x, z) < p.w / 2) ? 1 : 0;
   };
 
   // 1) Positionen: Bäume auf verschobenem Gitter, Gras zufällig
@@ -86,7 +96,7 @@ export function createForest({ trees, grass }, clear) {
   for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
     const x = X0 + EDGE_MARGIN + (i + 0.5 + (rnd() - 0.5) * 0.7) * TREE_SPACING;
     const z = Z0 + EDGE_MARGIN + (j + 0.5 + (rnd() - 0.5) * 0.7) * TREE_SPACING;
-    if (zoneAt(x, z) !== 0) continue;
+    if (zoneAt(x, z) !== 0 || rnd() < TREE_SKIP) continue;   // TREE_SKIP: lichterer Wald
     treeList.push({ x, z, type: pickWeighted(TREES, rnd()), yaw: rnd() * Math.PI * 2, s: 0.8 + rnd() * 0.45 });
   }
   const grassList = [];

@@ -8,6 +8,9 @@ import {
 import { generateFieldBiomes, buildSplat, countBiomes, findSpawnField, fieldCenter, fieldNumber, fieldRowCol } from './mapgen.js';
 import { loadAssets } from './characters.js';
 import { loadForest, createForest } from './forest.js';
+import { loadVillage, createVillage, MERCHANT_SPOT } from './village.js';
+import { loadNpc, createNpc } from './npc.js';
+import { POTION_PACK, POTION_BUY_PRICE, POTION_SELL_PRICE, POTION_HEAL_PCT } from './config.js';
 import { Game } from './game.js';
 import { CharacterSelect } from './select.js';
 import { MapView } from './minimap.js';
@@ -22,7 +25,7 @@ window.__started = true;
 const $ = (id) => document.getElementById(id);
 
 // ---------- Hilfsfunktionen für Bildschirme ----------------------------------------
-const screens = ['loading', 'mainMenu', 'confirm', 'charSelect', 'bigMap', 'inventory', 'skills', 'pause', 'errorBox'];
+const screens = ['loading', 'mainMenu', 'confirm', 'charSelect', 'bigMap', 'inventory', 'skills', 'shop', 'pause', 'errorBox'];
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
 function showOnly(...ids) { screens.forEach((s) => (ids.includes(s) ? show(s) : hide(s))); }
@@ -111,6 +114,7 @@ function toMainMenu() {
   paused = false;
   invOpen = false;
   skillsOpen = false;
+  shopOpen = false;
   hide('hud');
   refreshMenu();
   showOnly('mainMenu');
@@ -324,6 +328,92 @@ $('skRows').addEventListener('click', (e) => {
   if (game.stats.select(b.dataset.skill)) { renderSkills(); updateHealthBar(); saveNow(false); }
 });
 
+// ---------- Credits, Tränke und Händler ---------------------------------------------
+const POTION_SVG = '<svg viewBox="0 0 24 24" width="1em" height="1em"><path d="M9 2h6v2h-1v4.2l4.4 8.1A3 3 0 0 1 15.8 21H8.2a3 3 0 0 1-2.6-4.7L10 8.2V4H9z" fill="#d83a2e" stroke="#ffd0c8" stroke-width="1.2" stroke-linejoin="round"/><path d="M7.6 15h8.8l1.2 2.2A1.6 1.6 0 0 1 16.2 19.5H7.8a1.6 1.6 0 0 1-1.4-2.3z" fill="#ff8f80" opacity=".75"/></svg>';
+document.querySelectorAll('.pot-ico').forEach((el) => { el.innerHTML = POTION_SVG; });
+$('potionBar').querySelector('.slot').insertAdjacentHTML('beforeend', `<i class="pot-ico">${POTION_SVG}</i><em id="potBadge">0</em>`);
+
+const fmt = (n) => n.toLocaleString('de-DE');
+function updateWallet() {
+  const s = game.stats;
+  $('credVal').textContent = fmt(s.credits);
+  $('potVal').textContent = fmt(s.potions);
+  $('potBadge').textContent = s.potions > 999 ? '999+' : s.potions;
+  if (shopOpen) renderShop();
+}
+// Ein Zombie hat Credits fallen lassen: automatisch eingesammelt, oben links gezählt
+window.addEventListener('credits', (e) => {
+  updateWallet();
+  const g = $('credGain');
+  g.textContent = `+${e.detail.amount}`;
+  g.classList.remove('pop'); void g.offsetWidth; g.classList.add('pop');
+});
+
+function drinkPotion() {
+  if (state !== 'game' || paused) return;
+  const r = game.usePotion();
+  if (r === 'ok') { toast(`Roter Trank getrunken: HP ${Math.ceil(game.stats.hp)} / ${game.stats.maxHp}`); updateHealthBar(); saveNow(false); }
+  else if (r === 'none') toast('Keine Tränke – beim Händler im Dorf (Feld 35) kaufen');
+  else if (r === 'full') toast('Deine HP sind schon voll');
+}
+$('hudPotion').onclick = drinkPotion;
+window.addEventListener('slotuse', (e) => { if (e.detail.bar === 'potion' && e.detail.index === 0) drinkPotion(); });
+
+let shopOpen = false, shopTab = 'buy', shopPacks = 1, shopMsg = '';
+function renderShop() {
+  const s = game.stats, buy = shopTab === 'buy';
+  const maxPacks = buy ? Math.floor(s.credits / POTION_BUY_PRICE) : Math.floor(s.potions / POTION_PACK);
+  shopPacks = Math.max(1, Math.min(shopPacks, Math.max(1, maxPacks)));
+  const price = (buy ? POTION_BUY_PRICE : POTION_SELL_PRICE) * shopPacks, amount = POTION_PACK * shopPacks;
+  $('shopCredits').textContent = fmt(s.credits);
+  $('shopPotions').textContent = fmt(s.potions);
+  $('tabBuy').classList.toggle('primary', buy); $('tabSell').classList.toggle('primary', !buy);
+  $('shopItemInfo').innerHTML = `<b>Roter Trank (HP)</b><span>Heilt ${Math.round(POTION_HEAL_PCT * 100)} % deiner maximalen HP. ` +
+    (buy ? `${POTION_PACK} Tränke kosten ${POTION_BUY_PRICE} Credits.` : `Der Händler zahlt ${POTION_SELL_PRICE} Credits für ${POTION_PACK} Tränke.`) + '</span>';
+  $('qtyVal').textContent = `${shopPacks} × ${POTION_PACK}`;
+  const can = maxPacks >= 1 && shopPacks <= maxPacks;
+  const btn = $('btnShopDo');
+  btn.textContent = buy ? `Kaufen: ${fmt(amount)} Tränke für ${fmt(price)} Credits` : `Verkaufen: ${fmt(amount)} Tränke für ${fmt(price)} Credits`;
+  btn.disabled = !can;
+  $('shopMsg').textContent = shopMsg || (can ? '' : buy ? `Zu wenig Credits (du brauchst ${POTION_BUY_PRICE}).` : `Du hast weniger als ${POTION_PACK} Tränke.`);
+  $('shopMsg').classList.toggle('warn', !shopMsg && !can);
+}
+function openShop() {
+  if (state !== 'game' || paused || !game.nearNpc()) return;
+  shopOpen = true; shopTab = 'buy'; shopPacks = 1; shopMsg = '';
+  paused = game.paused = true;
+  renderShop();
+  showOnly('shop');
+}
+function closeShop() {
+  shopOpen = false;
+  paused = game.paused = false;
+  showOnly();
+  updateHealthBar();
+  saveNow(false);
+}
+$('btnShopClose').onclick = closeShop;
+$('tabBuy').onclick = () => { shopTab = 'buy'; shopPacks = 1; shopMsg = ''; renderShop(); };
+$('tabSell').onclick = () => { shopTab = 'sell'; shopPacks = 1; shopMsg = ''; renderShop(); };
+$('qtyMinus').onclick = () => { shopPacks = Math.max(1, shopPacks - 1); shopMsg = ''; renderShop(); };
+$('qtyPlus').onclick = () => { shopPacks++; shopMsg = ''; renderShop(); };
+$('qtyMax').onclick = () => { const s = game.stats; shopPacks = Math.max(1, shopTab === 'buy' ? Math.floor(s.credits / POTION_BUY_PRICE) : Math.floor(s.potions / POTION_PACK)); shopMsg = ''; renderShop(); };
+$('btnShopDo').onclick = () => {
+  const s = game.stats;
+  if (shopTab === 'buy') {
+    const cost = POTION_BUY_PRICE * shopPacks;
+    if (s.credits < cost) return;
+    s.credits -= cost; s.potions += POTION_PACK * shopPacks;
+    shopMsg = `Gekauft: ${fmt(POTION_PACK * shopPacks)} Tränke.`;
+  } else {
+    if (s.potions < POTION_PACK * shopPacks) return;
+    s.potions -= POTION_PACK * shopPacks; s.credits += POTION_SELL_PRICE * shopPacks;
+    shopMsg = `Verkauft: ${fmt(POTION_PACK * shopPacks)} Tränke für ${fmt(POTION_SELL_PRICE * shopPacks)} Credits.`;
+  }
+  updateWallet(); renderShop(); saveNow(false);
+};
+$('npcPrompt').onclick = openShop;
+
 // Pause
 function openPause() { paused = game.paused = true; showOnly('pause'); }
 function closePause() { paused = game.paused = false; showOnly(); }
@@ -359,6 +449,7 @@ window.addEventListener('keydown', (e) => {
   if (state !== 'game') return;
   if (e.code === 'Escape') {
     if (bigOpen) closeBigMap();
+    else if (shopOpen) closeShop();
     else if (skillsOpen) closeSkills();
     else if (invOpen) closeInventory();
     else if (paused) closePause();
@@ -367,6 +458,10 @@ window.addEventListener('keydown', (e) => {
     if (bigOpen) closeBigMap(); else if (!paused) openBigMap();
   } else if (e.code === 'KeyI') {
     if (invOpen) closeInventory(); else openInventory();
+  } else if (e.code === 'KeyE' && !e.repeat) {
+    if (shopOpen) closeShop(); else openShop();
+  } else if (e.code === 'Digit1' && !e.repeat) {
+    drinkPotion();
   } else if (e.code === 'KeyK') {
     if (skillsOpen) closeSkills(); else openSkills();
   } else if (e.code === 'KeyF' && !paused && !e.repeat) {
@@ -383,6 +478,7 @@ window.addEventListener('beforeunload', () => { if (state === 'game') saveNow(fa
 // Lebensbalken oben in der Mitte: Level, HP und Kills bis zum nächsten Level
 function updateHealthBar() {
   const s = game.stats;
+  updateWallet();
   $('hhLevel').textContent = `Level ${s.level}`;
   $('hhKills').textContent = s.isMaxLevel ? `${s.total} Kills · Max` : `${s.kills} / ${s.needed} Kills`;
   $('hhText').textContent = `${Math.ceil(s.hp)} / ${s.maxHp} HP`;
@@ -416,6 +512,7 @@ function updateHud(dt) {
     $('hudBiome').textContent = game.currentBiomeName + (game.currentField === game.activeField ? ' · aktives Feld' : '');
     $('hudPos').textContent = `x ${Math.round(game.player.x)}  z ${Math.round(game.player.z)}`;
     updateHealthBar();
+    $('npcPrompt').classList.toggle('hidden', paused || !game.nearNpc());   // "E – Händler ansprechen"
   }
   if (miniTimer <= 0) { miniTimer = 0.1; drawMaps(); }
   if (autosaveTimer > 20) { autosaveTimer = 0; saveNow(false); }
@@ -444,6 +541,10 @@ async function init() {
   // Wald in Feld 45: Weg vom Startpunkt zur Lichtung mit dem Zombie-Haufen (50 m nördlich), links und rechts Wald
   const sp = game.startPoint;
   game.setForest(createForest(await loadForest(), { start: sp, horde: { x: sp.x, z: sp.z - 50 }, pathW: 9, startR: 7, hordeR: 15 }));
+  // Dorf in Feld 35 (Straße führt nach Süden in den Wald von Feld 45)
+  game.setVillage(createVillage(await loadVillage()));
+  await loadNpc();                                  // Händler: Zombie ohne Rot, steht am Dorfplatz
+  game.setNpc(createNpc(MERCHANT_SPOT));
   select = new CharacterSelect(renderer);
   select.onChange = updateCharInfo;
   select.resize();

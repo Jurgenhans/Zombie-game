@@ -77,6 +77,20 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Wirkung: Lebenspunkte erhöhen die maximalen HP, Verteidigung senkt Zombie-Schaden, Schaden wird auf den Waffenschaden aufgeschlagen. **Resistenz** hat noch keine Wirkung, weil es noch keine Magie- oder Gift-Angriffe gibt.
 
 ## Wald (Feld 45)
-- `js/forest.js`: Nur Feld 45 ist ein dichter Wald (ca. 3300 Bäume, Abstand 5 m) mit viel Gras (16000 Büschel). Modelle: `assets/forest/` (Free Forest Nature Pack).
+- `js/forest.js`: Nur Feld 45 ist ein dichter Wald (ca. 2700 Bäume, Raster 5 m, davon 20 % weggelassen: `TREE_SKIP`) mit viel Gras (16000 Büschel). Modelle: `assets/forest/` (Free Forest Nature Pack).
+- Ein 9 m breiter Weg führt quer durch Feld 45 von Feld 35 (Norden) nach Feld 55 (Süden), siehe `paths` in `createForest`.
 - Vom Startpunkt führt ein 9 m breiter Weg (fast ohne Gras) 50 m nach Norden zu einer runden Lichtung (15 m Radius) mit dem Zombie-Haufen, links und rechts davon ist Wald (`createForest`-Aufruf in `main.js`: `pathW`, `startR`, `hordeR`). Dichte und Menge einstellbar oben in `forest.js` (`TREE_SPACING`, `GRASS_COUNT`, `GRASS_VIEW`).
 - Baumstämme sind für den Spieler fest (`collide`). Gezeichnet wird per InstancedMesh in Blöcken, Gras nur im Umkreis von 100 m.
+
+## Dorf (Feld 35)
+- `js/village.js`: Dorf mit 6 Häusern (je 3 links und rechts einer Erdstraße), Dorfplatz mit Brunnen, 3 Marktständen, Bänken und Waren, Hühnerhof mit Zaun, Gemüsegarten mit Vogelscheuche, Bienenstöcke, Apfelbäume, Holzstapel, Fässer, Kisten usw. Modelle: `assets/village/` (Avramania Free Collection, CC0).
+- Die Dorfstraße liegt auf x = 1350, also genau auf der Linie des Wegs durch den Wald in Feld 45: Weg Feld 55 -> Feld 45 -> Feld 35 -> Dorfplatz.
+- Häuser, Stände, Zäune und größeres Zubehör sind für den Spieler fest (`collide`). Hausposition und Zubehör stehen als Liste in `createVillage` (Koordinaten in Metern).
+
+## Credits, Tränke und Händler
+- **Credits** stehen oben links im HUD. Jeder besiegte Zombie lässt **2 bis 5 Credits** fallen (`CREDITS_DROP_MIN/MAX` in `config.js`), sie werden automatisch eingesammelt (grünes "+3" neben der Zahl). Credits und Tränke stehen im Spielstand (`stats.js`).
+- **Händler** (`js/npc.js`): ein Zombie ohne Rot/Blut (`assets/npc/Zombie_NPC.glb`, Grundlage Zombie_135) am Dorfplatz in Feld 35 (Standort `MERCHANT_SPOT` in `village.js`). Er greift nicht an und ist für den Spieler fest.
+- **Ansprechen:** nah herangehen (3,5 m), dann erscheint "E Händler ansprechen" (am Handy antippen) oder Taste **E**. Im Fenster: **Kaufen** und **Verkaufen**, Menge in Paketen zu 100 (+ / − / Max).
+  - Kaufen: **100 rote Tränke = 50 Credits** (`POTION_PACK`, `POTION_BUY_PRICE`).
+  - Verkaufen: 100 Tränke = 25 Credits (halber Preis, `POTION_SELL_PRICE`).
+- **Trank trinken:** Taste **1**, Klick auf die Trank-Anzeige oben links oder (Handy) Trank-Slot 1. Ein Trank heilt 30 % der max. HP, mindestens 30 (`POTION_HEAL_PCT`). Bei vollen HP wird keiner verbraucht.

@@ -1,7 +1,7 @@
 // Die Spielwelt: Boden, Himmel, Spielerfigur, Kamera, Steuerung.
 
 import * as THREE from 'three';
-import { MAP_SIZE, FIELD_SIZE, WALK_SPEED, RUN_SPEED, BIOME_NAMES, TOUCH, ATTACK_SPEED_MULT } from './config.js';
+import { MAP_SIZE, FIELD_SIZE, WALK_SPEED, RUN_SPEED, BIOME_NAMES, TOUCH, ATTACK_SPEED_MULT, CREDITS_DROP_MIN, CREDITS_DROP_MAX, POTION_HEAL_PCT, NPC_TALK_DIST } from './config.js';
 import { createTerrain, createSky, SKY_HORIZON, FOG_NEAR, FOG_FAR } from './terrain.js';
 import { fieldAtWorld, fieldCenter, fieldRowCol, fieldNumber } from './mapgen.js';
 import { createActor } from './characters.js';
@@ -66,6 +66,9 @@ export class Game {
     this.stats = new PlayerStats();     // Level, HP, Kills
     this.pendingDeath = false;
     this.enemies.onKill = () => {
+      const c = CREDITS_DROP_MIN + Math.floor(Math.random() * (CREDITS_DROP_MAX - CREDITS_DROP_MIN + 1));   // Drop: 2 bis 5 Credits
+      this.stats.credits += c;
+      window.dispatchEvent(new CustomEvent('credits', { detail: { amount: c } }));
       const r = this.stats.addKill();
       if (r.levelUp || r.skillUp) {
         window.dispatchEvent(new CustomEvent('progress', { detail: {
@@ -92,6 +95,33 @@ export class Game {
     if (this.forest) this.scene.remove(this.forest.group);
     this.forest = forest;
     this.scene.add(forest.group);
+  }
+
+  // Händler-NPC (js/npc.js) in die Welt einsetzen
+  setNpc(npc) {
+    if (this.npc) this.scene.remove(this.npc.group);
+    this.npc = npc;
+    this.scene.add(npc.group);
+  }
+  // true, wenn der Spieler nah genug am Händler steht, um ihn anzusprechen
+  nearNpc() { return !!this.npc && this.mode === 'play' && this.npc.dist(this.player.x, this.player.z) < NPC_TALK_DIST; }
+
+  // Einen roten Trank trinken: heilt POTION_HEAL_PCT der max. HP. Gibt 'ok' | 'none' (keine Tränke) | 'full' | 'dead' zurück.
+  usePotion() {
+    const s = this.stats;
+    if (this.pendingDeath || s.hp <= 0) return 'dead';
+    if (s.potions <= 0) return 'none';
+    if (s.hp >= s.maxHp) return 'full';
+    s.potions--;
+    s.heal(Math.max(30, Math.round(s.maxHp * POTION_HEAL_PCT)));
+    return 'ok';
+  }
+
+  // Dorf (js/village.js) in die Welt einsetzen
+  setVillage(village) {
+    if (this.village) this.scene.remove(this.village.group);
+    this.village = village;
+    this.scene.add(village.group);
   }
 
   // ---- Menühintergrund: Kamera kreist über der Karte -------------------------------
@@ -258,6 +288,7 @@ export class Game {
 
   // ---- Update ----------------------------------------------------------------------
   update(dt) {
+    this.npc?.update(dt);
     this.forest?.update(this.camera.position.x, this.camera.position.z);   // Gras nur in der Nähe zeichnen
     if (this.mode === 'backdrop') { this._updateBackdrop(dt); return; }
     this._updatePlay(dt);
@@ -310,7 +341,7 @@ export class Game {
       const speed = (run ? RUN_SPEED : WALK_SPEED * (joy ? Math.max(0.35, mag / TOUCH.RUN_AT) : 1)) * (attacking ? 0.5 : 1);
       this.player.x = Math.min(MAP_SIZE - EDGE, Math.max(EDGE, this.player.x + dx * speed * dt));
       this.player.z = Math.min(MAP_SIZE - EDGE, Math.max(EDGE, this.player.z + dz * speed * dt));
-      if (this.forest) { const p = this.forest.collide(this.player.x, this.player.z); this.player.x = p.x; this.player.z = p.z; }   // Baumstämme sind fest
+      for (const w of [this.forest, this.village, this.npc]) if (w) { const p = w.collide(this.player.x, this.player.z); this.player.x = p.x; this.player.z = p.z; }   // Bäume, Häuser und Zubehör sind fest
       // Figur dreht sich weich in Laufrichtung (Modelle blicken nach +Z)
       const target = Math.atan2(dx, dz);
       let diff = target - this.player.yaw;

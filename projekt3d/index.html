@@ -82,13 +82,15 @@
   <!-- Spiel-HUD -->
   <div id="hud" class="hidden">
     <div id="hudInfo" class="hud-card">
+      <div id="hudCredits" class="hud-credits" title="Credits (Zombies lassen 2 bis 5 fallen)"><span class="coin">🪙</span><b id="credVal">0</b><span>Credits</span><span id="credGain" class="cred-gain"></span></div>
+      <button id="hudPotion" class="hud-potion" title="Roten Trank trinken (Taste 1)"><span class="pot-ico"></span><b id="potVal">0</b><small>Tränke · Taste 1</small></button>
       <div id="hudField" class="hud-field">Feld 45</div>
       <div id="hudBiome" class="hud-sub">Gras</div>
       <div id="hudPos" class="hud-sub dim"></div>
     </div>
     <div id="hudHelp" class="hud-card help">
       <b>WASD</b> Bewegen · <b>Shift</b> Rennen · <b>Maus ziehen</b> Kamera · <b>Mausrad</b> Zoom<br>
-      <b>M</b> Karte · <b>G</b> Gitter · <b>I</b> Inventar · <b>K</b> Skills · <b>F</b> Schlagen · <b>Esc</b> Menü
+      <b>M</b> Karte · <b>G</b> Gitter · <b>I</b> Inventar · <b>K</b> Skills · <b>F</b> Schlagen · <b>E</b> Händler · <b>1</b> Trank · <b>Esc</b> Menü
     </div>
     <div id="hurtFlash"></div>
     <div id="hudHealth" class="hud-health" aria-label="Lebensbalken">
@@ -97,6 +99,7 @@
       <div id="hhSkill" class="hh-skill"></div>
     </div>
     <div id="hudToast" class="toast hidden"></div>
+    <button id="npcPrompt" class="npc-prompt hidden"><kbd>E</kbd> Händler ansprechen</button>
 
     <!-- Touch-Oberfläche (nur auf Handy/Tablet sichtbar) -->
     <div id="joyBase" class="touch-ui"><div id="joyKnob"></div></div>
@@ -168,6 +171,34 @@
         <div id="invInfoText"></div>
         <button id="btnInvAction" class="btn small primary hidden">Ausrüsten</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Händler -->
+  <div id="shop" class="screen modal hidden">
+    <div class="inv-panel shop-panel">
+      <div class="inv-head">
+        <h2>Händler</h2>
+        <button id="btnShopClose" class="btn small">Schließen ✕</button>
+      </div>
+      <p class="shop-talk">„Rote Tränke, frisch gebraut. Stell keine Fragen.“</p>
+      <div class="shop-wallet"><span>🪙 <b id="shopCredits">0</b> Credits</span><span><i class="pot-ico"></i> <b id="shopPotions">0</b> Tränke</span></div>
+      <div class="shop-tabs">
+        <button id="tabBuy" class="btn small primary">Kaufen</button>
+        <button id="tabSell" class="btn small">Verkaufen</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-ico"><i class="pot-ico"></i></div>
+        <div id="shopItemInfo" class="shop-iteminfo"></div>
+      </div>
+      <div class="shop-qty">
+        <button id="qtyMinus" class="btn small" aria-label="Weniger">−</button>
+        <span id="qtyVal">1 × 100</span>
+        <button id="qtyPlus" class="btn small" aria-label="Mehr">+</button>
+        <button id="qtyMax" class="btn small">Max</button>
+      </div>
+      <button id="btnShopDo" class="btn primary shop-do">Kaufen</button>
+      <div id="shopMsg" class="shop-msg"></div>
     </div>
   </div>
 
