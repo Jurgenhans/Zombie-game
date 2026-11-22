@@ -1,16 +1,26 @@
 // Gegner: Zombie-Gruppe, Verhalten (Stehen / Verfolgen / Angreifen / Zurückgehen), Trefferlogik und Geschosse.
 
 import * as THREE from 'three';
-import { MAP_SIZE } from './config.js';
-import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE } from './zombies.js';
+import { MAP_SIZE, FIELD_SIZE, FIELD_COUNT, GRID, MAP_SEED } from './config.js';
+import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE, NEW_ZOMBIE_KINDS } from './zombies.js';
 
 const AGGRO = 18;      // ab dieser Entfernung (m) bemerken sie den Spieler
 const LOSE = 35;       // ab dieser Entfernung geben sie auf
 const REACH = 1.5 * ZOMBIE_SCALE;     // so nah gehen sie heran
 const HIT_INTERVAL = 1.4;   // Sekunden zwischen zwei Zombie-Schlägen (Schaden pro Typ: damage in zombies.js)
+const MAP_ZOMBIES = 40;   // so viele der drei neuen Zombie-Typen stehen verteilt auf der Karte (je Feld höchstens einer)
+const VIEW_DIST = 350;    // ruhende Zombies weiter weg werden nicht gezeichnet und nicht animiert (spart Leistung)
 const RESPAWN = 20;    // Sekunden, bis ein besiegter Zombie wieder aufsteht (zum Testen)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const ease = (t) => t * t * (3 - 2 * t);
+
+// Speicher freigeben, wenn Modelle entfernt werden (die gemeinsame Schatten-Textur bleibt erhalten)
+function disposeTree(root) {
+  root.traverse((o) => {
+    if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); }
+    else if (o.isSprite) o.material.dispose();
+  });
+}
 
 let shadowTex = null;
 function blobShadow() {
@@ -41,18 +51,54 @@ export class EnemyManager {
   // count Zombies als dichter Haufen, dessen Mitte `radius` m vom Startpunkt entfernt liegt
   // (dir = Richtung in rad; -PI/2 = nach Norden, also geradeaus vom Startpunkt aus gesehen).
   // Abwechselnd Schlurfer / Brocken.
-  spawnHorde(center, count = 10, radius = 50, dir = -Math.PI / 2) {
+  // `extra` = weitere Typen, die mitten im Haufen stehen (Plätze 2, 5, 8 ...).
+  spawnHorde(center, count = 10, radius = 50, dir = -Math.PI / 2, extra = []) {
     this.clear();
     const cx = center.x + Math.cos(dir) * radius, cz = center.z + Math.sin(dir) * radius;
     const kinds = ['walker', 'brute'];
-    for (let i = 0; i < count; i++) {
+    const extraAt = extra.map((_, k) => 2 + k * 3);
+    let old = 0;
+    for (let i = 0; i < count + extra.length; i++) {
+      const k = extraAt.indexOf(i);
+      const kind = k >= 0 ? extra[k] : kinds[old++ % 2];
       const a = i * 2.39996, r = 1.35 * Math.sqrt(i);                    // Sonnenblumen-Muster: dicht, ohne Überlappung
-      this._add(kinds[i % 2], cx + Math.cos(a) * r, cz + Math.sin(a) * r, Math.random() * Math.PI * 2);
+      this._add(kind, cx + Math.cos(a) * r, cz + Math.sin(a) * r, Math.random() * Math.PI * 2);
     }
   }
 
+  // `count` Zombies der Typen `kinds` (reihum) verteilt über die Karte: jeweils in einem anderen Feld, nie im Startfeld.
+  // Feste Zufallsfolge (MAP_SEED), die Verteilung ist also bei jedem Start gleich.
+  spawnScattered(count, kinds, start) {
+    let s = (MAP_SEED ^ 0x9e3779b9) >>> 0;
+    const rnd = () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const startField = Math.floor(start.z / FIELD_SIZE) * GRID + Math.floor(start.x / FIELD_SIZE);
+    const fields = [];
+    for (let i = 0; i < FIELD_COUNT; i++) if (i !== startField) fields.push(i);
+    for (let i = fields.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [fields[i], fields[j]] = [fields[j], fields[i]]; }
+    const margin = 30;                                                     // Abstand zum Feldrand
+    for (let i = 0; i < count; i++) {
+      const f = fields[i % fields.length], row = Math.floor(f / GRID), col = f % GRID;
+      const x = col * FIELD_SIZE + margin + rnd() * (FIELD_SIZE - 2 * margin);
+      const z = row * FIELD_SIZE + margin + rnd() * (FIELD_SIZE - 2 * margin);
+      this._add(kinds[i % kinds.length], x, z, rnd() * Math.PI * 2);
+    }
+  }
+
+  // Die ganze Zombie-Welt: der Haufen am Start (mit den 3 neuen Typen mittendrin) und die verteilten Zombies
+  spawnWorld(start) {
+    this.spawnHorde(start, 10, 50, -Math.PI / 2, NEW_ZOMBIE_KINDS);
+    this.spawnScattered(MAP_ZOMBIES, NEW_ZOMBIE_KINDS, start);
+  }
+
+  // Alle Zombies zurück an ihren Platz (volle HP), ohne die Modelle neu zu bauen
+  resetAll() {
+    for (const s of this.shots) this.scene.remove(s.mesh);
+    this.shots = [];
+    for (const e of this.list) this._reset(e);
+  }
+
   clear() {
-    for (const z of this.list) this.scene.remove(z.holder);
+    for (const z of this.list) { this.scene.remove(z.holder); disposeTree(z.holder); }
     for (const s of this.shots) this.scene.remove(s.mesh);
     this.list = []; this.shots = [];
   }
@@ -194,6 +240,8 @@ export class EnemyManager {
     }
 
     const dx = player.x - e.x, dz = player.z - e.z, d = Math.hypot(dx, dz);
+    e.holder.visible = d < VIEW_DIST || e.state !== 'idle';
+    if (!e.holder.visible) return;                                   // weit weg und ruhig: nichts zu zeichnen oder zu animieren
     if ((e.state === 'idle' || e.state === 'return') && d < AGGRO) e.state = 'chase';
     else if ((e.state === 'chase' || e.state === 'attack') && d > LOSE) e.state = 'return';
 

@@ -53,6 +53,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Zombies haben **Lebenspunkte** (`hp` in `js/zombies.js`: Schlurfer 20, Brocken 40). Jeder Treffer zieht den Schaden der Waffe ab (Schwert 10, Axt 14, Bogen 8, Stab 12, Armbrust 11, Faust 2, dazu der Schaden-Skill). Wer mindestens so viel Schaden macht wie der Zombie HP hat, besiegt ihn mit **einem** Treffer.
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
+- **Drei weitere, genauere Lowpoly-Zombies** (`soldier` Soldat, `doctor` Doktor, `worker` Bauarbeiter, in `js/zombies.js`): gleiche Größe und gleiche Werte wie der Schlurfer. Je einer steht im Haufen, dazu stehen **40 Zombies verteilt auf der Karte** (je Feld höchstens einer, nie im Startfeld, feste Verteilung). Weit entfernte, ruhende Zombies werden nicht gezeichnet (`VIEW_DIST` in `js/enemies.js`).
 - Anzahl, Abstand und Richtung des Haufens: `spawnHorde(...)` in `js/game.js`.
 
 ## Level und Lebensbalken

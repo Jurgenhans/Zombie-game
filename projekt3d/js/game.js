@@ -103,7 +103,7 @@ export class Game {
     this.pending = null;
     this.applyEquipment();
     this.player = { x, z, yaw };
-    this.enemies.spawnHorde(this.startPoint ?? { x, z }, 10, 50);   // 10 Zombies als Haufen, 50 m vom Startpunkt
+    this.enemies.spawnWorld(this.startPoint ?? { x, z });   // Haufen 50 m vom Startpunkt + 40 neue Zombies verteilt auf der Karte
     this.cam.yaw = yaw + Math.PI;   // Kamera hinter die Figur
     this.mode = 'play';
     this.paused = false;
@@ -153,7 +153,7 @@ export class Game {
     this.stats.hp = this.stats.maxHp;
     this.player.x = s.x; this.player.z = s.z;
     this.attackT = -1; this.pending = null; this.attackHeld = false;
-    this.enemies.spawnHorde(s, 10, 50);
+    this.enemies.resetAll();
     this._syncActor();
     window.dispatchEvent(new CustomEvent('playerdied'));
   }
