@@ -7,7 +7,6 @@ import { createZombieModel, ZOMBIE_TYPES, ZOMBIE_SCALE } from './zombies.js';
 const AGGRO = 18;      // ab dieser Entfernung (m) bemerken sie den Spieler
 const LOSE = 35;       // ab dieser Entfernung geben sie auf
 const REACH = 1.5 * ZOMBIE_SCALE;     // so nah gehen sie heran
-const HITS_TO_KILL = 2;   // Treffer, die ein Zombie aushält (egal mit welcher Waffe)
 const HIT_INTERVAL = 1.4;   // Sekunden zwischen zwei Zombie-Schlägen (Schaden pro Typ: damage in zombies.js)
 const RESPAWN = 20;    // Sekunden, bis ein besiegter Zombie wieder aufsteht (zum Testen)
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -74,7 +73,7 @@ export class EnemyManager {
     bg.scale.set(1, 0.13, 1);
 
     const e = { kind, type, holder, model, rig: model.rig, mats: model.mats, bg, fill,
-      x, z, yaw, bx: x, bz: z, byaw: yaw, hp: HITS_TO_KILL, state: 'idle', phase: Math.random() * 6, flash: 0, deathT: 0, atkT: 0 };
+      x, z, yaw, bx: x, bz: z, byaw: yaw, hp: type.hp, state: 'idle', phase: Math.random() * 6, flash: 0, deathT: 0, atkT: 0 };
     this.scene.add(holder);
     this.list.push(e);
     this._place(e);
@@ -83,7 +82,7 @@ export class EnemyManager {
   _place(e) { e.holder.position.set(e.x, e.holder.position.y, e.z); e.holder.rotation.y = e.yaw; }
 
   _reset(e) {
-    e.x = e.bx; e.z = e.bz; e.yaw = e.byaw; e.hp = HITS_TO_KILL; e.state = 'idle'; e.deathT = 0; e.flash = 0;
+    e.x = e.bx; e.z = e.bz; e.yaw = e.byaw; e.hp = e.type.hp; e.state = 'idle'; e.deathT = 0; e.flash = 0;
     e.model.group.rotation.x = 0; e.holder.position.y = 0;
     e.bg.visible = e.fill.visible = false;
     this._place(e);
@@ -92,7 +91,7 @@ export class EnemyManager {
   // ---- Treffer ------------------------------------------------------------------
   hit(e, dmg, fromX, fromZ) {
     if (e.state === 'dead') return;
-    e.hp -= 1;                                                          // jeder Treffer zählt gleich (HITS_TO_KILL)
+    e.hp -= dmg;                                                        // Schaden der Waffe zieht Lebenspunkte ab
     e.flash = 0.15;
     const dx = e.x - fromX, dz = e.z - fromZ, d = Math.hypot(dx, dz) || 1;
     e.x += (dx / d) * 0.35; e.z += (dz / d) * 0.35;                    // kleiner Rückstoß
@@ -103,7 +102,7 @@ export class EnemyManager {
       return;
     }
     if (e.state === 'idle' || e.state === 'return') e.state = 'chase';
-    const r = e.hp / HITS_TO_KILL;
+    const r = e.hp / e.type.hp;
     e.bg.visible = e.fill.visible = true;
     e.fill.scale.set(0.94 * r, 0.09, 1);
     e.fill.center.set(0.47 / (0.94 * r), 0.5);                         // linksbündig

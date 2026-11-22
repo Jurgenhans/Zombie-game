@@ -7,10 +7,10 @@ import * as THREE from 'three';
 
 export const ZOMBIE_SCALE = 1.3;   // Größe der Zombies (1.3 = 30 % größer)
 
-// Lebenspunkte werden in enemies.js über HITS_TO_KILL geregelt (2 Treffer pro Zombie).
+// hp = Lebenspunkte des Zombies. Jeder Treffer zieht den Schaden der Waffe ab (inkl. Schaden-Skill).
 export const ZOMBIE_TYPES = {
-  walker: { name: 'Schlurfer', hp: 2, speed: 1.6, height: 1.85 * ZOMBIE_SCALE, radius: 0.55 * ZOMBIE_SCALE, lean: 0.12, damage: 4 },
-  brute:  { name: 'Brocken',   hp: 4, speed: 1.1, height: 1.95 * ZOMBIE_SCALE, radius: 0.75 * ZOMBIE_SCALE, lean: 0.32, damage: 7 },
+  walker: { name: 'Schlurfer', hp: 20, speed: 1.6, height: 1.85 * ZOMBIE_SCALE, radius: 0.55 * ZOMBIE_SCALE, lean: 0.12, damage: 4 },
+  brute:  { name: 'Brocken',   hp: 40, speed: 1.1, height: 1.95 * ZOMBIE_SCALE, radius: 0.75 * ZOMBIE_SCALE, lean: 0.32, damage: 7 },
 };
 
 const PARAMS = {

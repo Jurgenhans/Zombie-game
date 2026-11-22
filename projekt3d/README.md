@@ -50,7 +50,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 
 ## Zombies
 - 10 Zombies stehen als dichter Haufen in Feld 45, dessen Mitte 50 m vom Startpunkt (Mitte von Feld 45) entfernt liegt (geradeaus nach Norden, also in Blickrichtung beim Start). Zwei selbstgebaute Lowpoly-Modelle, 30 % größer als das Grundmodell (`ZOMBIE_SCALE` in `js/zombies.js`): **Schlurfer** und **Brocken**.
-- Jeder Zombie hält **2 Treffer** aus, egal mit welcher Waffe (`HITS_TO_KILL` in `js/enemies.js`).
+- Zombies haben **Lebenspunkte** (`hp` in `js/zombies.js`: Schlurfer 20, Brocken 40). Jeder Treffer zieht den Schaden der Waffe ab (Schwert 10, Axt 14, Bogen 8, Stab 12, Armbrust 11, Faust 2, dazu der Schaden-Skill). Wer mindestens so viel Schaden macht wie der Zombie HP hat, besiegt ihn mit **einem** Treffer.
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
 - Anzahl, Abstand und Richtung des Haufens: `spawnHorde(...)` in `js/game.js`.
@@ -66,5 +66,5 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 ## Skills (Taste **K** oder ⭐-Knopf)
 - Alle 100 Kills (gesamt) gibt es 1 Skillpunkt, den du selbst auf einen von 4 Skills legst: **Schaden, Lebenspunkte, Verteidigung, Resistenz**. Jeder Punkt gibt +1 %, jeder Skill hat höchstens Level 15 (= 15 %), zusammen also 60 Punkte (6000 Kills).
 - Einstellungen: `SKILL_KILLS`, `SKILL_STEP`, `SKILL_MAX` in `js/config.js`; Logik in `js/stats.js` (`spend`, `bonus`).
-- Wirkung: Lebenspunkte erhöhen die maximalen HP, Verteidigung senkt Zombie-Schaden, Schaden erhöht den Schadenswert der Waffen. **Hinweis:** Zombies halten weiter 2 Treffer aus, egal wie viel Schaden, der Schaden-Skill ändert daran noch nichts. **Resistenz** hat noch keine Wirkung, weil es noch keine Magie- oder Gift-Angriffe gibt.
+- Wirkung: Lebenspunkte erhöhen die maximalen HP, Verteidigung senkt Zombie-Schaden, Schaden erhöht den Schadenswert der Waffen. **Resistenz** hat noch keine Wirkung, weil es noch keine Magie- oder Gift-Angriffe gibt.
 
