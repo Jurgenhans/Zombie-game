@@ -49,8 +49,8 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Nahkampf und Faust nutzen die Animation "Throw" (das Paket hat keine Nahkampf-Animationen). Bogen, Armbrust und Stab nutzen die zweite Animation "Use_Item"; sie wird pro Waffe in `js/items.js` mit `anim` gesetzt, der Schuss-Zeitpunkt mit `releaseAt` (0..1).
 
 ## Zombies
-- 10 Zombies stehen als dichter Haufen in Feld 45, dessen Mitte 50 m vom Startpunkt (Mitte von Feld 45) entfernt liegt (geradeaus nach Norden, also in Blickrichtung beim Start). Zwei selbstgebaute Lowpoly-Modelle, 30 % größer als das Grundmodell (`ZOMBIE_SCALE` in `js/zombies.js`): **Schlurfer** und **Brocken**.
-- Zombies haben **Lebenspunkte** (`hp` in `js/zombies.js`: Schlurfer 20, Brocken 40). Jeder Treffer zieht den Schaden der Waffe ab (Schwert 10, Axt 14, Bogen 8, Stab 12, Armbrust 11, Faust 2, dazu der Schaden-Skill). Wer mindestens so viel Schaden macht wie der Zombie HP hat, besiegt ihn mit **einem** Treffer.
+- Ein dichter Haufen Zombies steht in Feld 45, seine Mitte liegt 50 m vom Startpunkt (Mitte von Feld 45) entfernt (geradeaus nach Norden, also in Blickrichtung beim Start). Die Zombies sind 2,4 m groß (`ZOMBIE_SCALE` in `js/zombies.js`), Modelle und Anzahl siehe unten.
+- Zombies haben **Lebenspunkte** (`hp` in `js/zombies.js`: 20). Jeder Treffer zieht den Schaden der Waffe ab (Schwert 10, Axt 14, Bogen 8, Stab 12, Armbrust 11, Faust 2, dazu der Schaden-Skill). Wer mindestens so viel Schaden macht wie der Zombie HP hat, besiegt ihn mit **einem** Treffer.
 - Verhalten und Treffer: `js/enemies.js` (bemerken dich ab 18 m, verfolgen dich, gehen zurück, wenn du weit weg bist; besiegte stehen nach 20 s wieder auf).
 - Nahkampf (Schwert, Axt, Faust) trifft in Reichweite vor dir, Bogen/Armbrust/Magierstab verschießen Pfeil/Bolzen/Zauberkugel. Beim Schlag dreht sich die Figur automatisch zum nächsten Zombie im Blickfeld.
 - **Zombie-Set:** Alle Zombies im Spiel sind fertige GLB-Modelle aus `assets/zombies/` (`Zombie_001.glb` bis `Zombie_150.glb`, Typen `set001` bis `set150`). Alle haben dieselben Werte (20 HP, 4 Schaden, gleiche Geschwindigkeit und Größe wie der frühere Schlurfer, gleiches Verhalten).
@@ -67,7 +67,7 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
 - Level 1 hat 100 HP, Level 2 hat 200 HP ... Level 10 hat 1000 HP (`HP_PER_LEVEL`, `MAX_LEVEL` in `js/config.js`).
 - Aufstieg von Level n auf n+1 braucht `KILLS_PER_LEVEL * n` Kills in diesem Level: 100, 200, 300 ... 900 (zusammen 4500 Kills bis Level 10). Beim Aufstieg ist man wieder voll geheilt.
 - Die Werte stehen in `js/stats.js` (`PlayerStats`, mit `damage()`/`heal()` für später) und im Spielstand.
-- **Zombies schlagen zu**, wenn sie nah genug sind: alle 1,4 s, Schlurfer 4 Schaden, Brocken 7 (`damage` in `js/zombies.js`, `HIT_INTERVAL` in `js/enemies.js`). Rotes Aufblitzen am Bildrand bei Treffern.
+- **Zombies schlagen zu**, wenn sie nah genug sind: alle 1,4 s, 4 Schaden (`damage` in `js/zombies.js`, `HIT_INTERVAL` in `js/enemies.js`). Rotes Aufblitzen am Bildrand bei Treffern.
 - **0 HP**: Du landest voll geheilt am Startpunkt, der Zombie-Haufen steht wieder an seinem Platz. Level, Kills und Skills bleiben.
 
 ## Skills (Taste **K** oder ⭐-Knopf)
