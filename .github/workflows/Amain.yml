@@ -1,0 +1,37 @@
+name: Aktuelle ZIP erstellen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # manuell startbar im Actions-Tab
+
+permissions:
+  contents: write      # nötig, um das Release zu aktualisieren
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo auschecken
+        uses: actions/checkout@v4
+
+      - name: ZIP erstellen
+        run: |
+          zip -r Zombie-game.zip . -x ".git/*" ".github/*" "*.zip"
+
+      # Variante 1: ZIP als Artifact (im Actions-Run herunterladbar)
+      - name: ZIP als Artifact hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zombie-game
+          path: Zombie-game.zip
+
+      # Variante 2: ZIP als Release "latest" (feste Download-Adresse)
+      - name: Release "latest" aktualisieren
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Zombie-game.zip \
+            --title "Aktueller Stand" \
+            --notes "Automatisch erstellt aus Commit ${GITHUB_SHA::7}"
