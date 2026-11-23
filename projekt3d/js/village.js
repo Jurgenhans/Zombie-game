@@ -50,6 +50,7 @@ export async function loadVillage() {
 
 export function createVillage(models) {
   const group = new THREE.Group();
+  const props = [];
   const boxes = [], circles = [];   // Kollision: Rechtecke (Häuser, Zäune, Stände) und Kreise (Brunnen, Fässer, Bäume ...)
 
   // x, z = Mitte des Modells am Boden, yaw = Drehung (Vorderseite zeigt bei yaw 0 nach +Z, bei PI/2 nach +X)
@@ -64,6 +65,7 @@ export function createVillage(models) {
     pivot.rotation.y = yaw;
     pivot.scale.setScalar(s);
     group.add(pivot);
+    props.push(pivot);
     const w = m.w * s, d = m.d * s, cs = Math.abs(Math.cos(yaw)), sn = Math.abs(Math.sin(yaw));
     if (solid === 'box') {
       const hx = (cs * w + sn * d) / 2, hz = (sn * w + cs * d) / 2;
@@ -207,6 +209,7 @@ export function createVillage(models) {
   // ---- Kollision --------------------------------------------------------------------------------------------------
   const MINX = X0 + 20, MAXX = X0 + FIELD_SIZE - 20;   // grober Schnelltest: nur im Dorfbereich prüfen
   return {
+    props,
     group,
     // Schiebt einen Kreis (x, z, r) aus Häusern, Ständen, Zäunen und Zubehör heraus; gibt die neue Position zurück
     collide(x, z, r = 0.45) {

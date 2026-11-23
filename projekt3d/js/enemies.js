@@ -43,6 +43,7 @@ export class EnemyManager {
     this.scene = scene;
     this.list = [];
     this.shots = [];
+    this.viewDist = 350;   // ruhende Zombies weiter weg werden nicht gezeichnet (Grafik-Einstellung)
     this.groundY = null;   // (x, z) => Bodenhöhe (Berg); null = flach
     this.onKill = null;   // wird aufgerufen, wenn ein Zombie besiegt wurde
     this.onPlayerHit = null;   // (schaden, zombie): ein Zombie schlägt den Spieler
@@ -238,8 +239,10 @@ export class EnemyManager {
     }
 
     const dx = player.x - e.x, dz = player.z - e.z, d = Math.hypot(dx, dz);
-    e.holder.visible = d < VIEW_DIST || e.state !== 'idle';
-    if (!e.holder.visible) return;                                   // weit weg und ruhig: nichts zu zeichnen oder zu animieren
+    const inView = d < Math.min(VIEW_DIST, this.viewDist) || e.state !== 'idle';
+    e.dist = d;
+    e.holder.visible = inView && !e.culled;                          // culled = vom Objekt-Limit ausgeblendet
+    if (!inView) return;                                   // weit weg und ruhig: nichts zu zeichnen oder zu animieren
     if ((e.state === 'idle' || e.state === 'return') && d < AGGRO) e.state = 'chase';
     else if ((e.state === 'chase' || e.state === 'attack') && d > LOSE) e.state = 'return';
 

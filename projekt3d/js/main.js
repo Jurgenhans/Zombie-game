@@ -20,12 +20,13 @@ import { Inventory } from './inventory.js';
 import { ITEMS } from './items.js';
 import { InventoryUI } from './inventory-ui.js';
 import { SKILLS, SKILL_KEYS } from './stats.js';
+import { PRESETS, VIEW_MIN, VIEW_MAX, VIEW_STEP, OBJ_MIN, OBJ_MAX, OBJ_STEP, clampGfx, loadGfx, saveGfx } from './graphics.js';
 
 window.__started = true;
 const $ = (id) => document.getElementById(id);
 
 // ---------- Hilfsfunktionen für Bildschirme ----------------------------------------
-const screens = ['loading', 'mainMenu', 'confirm', 'charSelect', 'bigMap', 'inventory', 'skills', 'shop', 'pause', 'errorBox'];
+const screens = ['loading', 'mainMenu', 'confirm', 'charSelect', 'bigMap', 'inventory', 'skills', 'shop', 'pause', 'settings', 'errorBox'];
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
 function showOnly(...ids) { screens.forEach((s) => (ids.includes(s) ? show(s) : hide(s))); }
@@ -414,6 +415,36 @@ $('btnShopDo').onclick = () => {
 };
 $('npcPrompt').onclick = openShop;
 
+// Grafik-Einstellungen (Hauptmenü und Pause)
+let gfx = loadGfx(), settingsFrom = 'mainMenu';
+game.setGraphics(gfx);
+const gView = $('gfxView'), gObj = $('gfxObj');
+gView.min = VIEW_MIN; gView.max = VIEW_MAX; gView.step = VIEW_STEP;
+gObj.min = OBJ_MIN; gObj.max = OBJ_MAX; gObj.step = OBJ_STEP;
+function refreshGfxUi() {
+  gView.value = gfx.view; gObj.value = gfx.objects || OBJ_MAX;
+  $('gfxViewVal').textContent = `${gfx.view} m`;
+  $('gfxObjVal').textContent = gfx.objects ? gfx.objects.toLocaleString('de-DE') : 'alle';
+  document.querySelectorAll('#gfxPresets .btn').forEach((b) => {
+    const p = PRESETS[b.dataset.p];
+    b.classList.toggle('active', p.view === gfx.view && p.objects === gfx.objects);
+  });
+}
+function setGfx(g) { gfx = clampGfx(g); game.setGraphics(gfx); saveGfx(gfx); refreshGfxUi(); }
+for (const [key, p] of Object.entries(PRESETS)) {
+  const b = document.createElement('button');
+  b.className = 'btn small'; b.dataset.p = key; b.textContent = p.label;
+  b.onclick = () => setGfx(p);
+  $('gfxPresets').appendChild(b);
+}
+gView.oninput = () => setGfx({ ...gfx, view: +gView.value });
+gObj.oninput = () => setGfx({ ...gfx, objects: +gObj.value });
+function openSettings(from) { settingsFrom = from; refreshGfxUi(); showOnly('settings'); }
+function closeSettings() { showOnly(settingsFrom); }
+$('btnSettings').onclick = () => openSettings('mainMenu');
+$('btnSettingsPause').onclick = () => openSettings('pause');
+$('btnSettingsClose').onclick = closeSettings;
+
 // Pause
 function openPause() { paused = game.paused = true; showOnly('pause'); }
 function closePause() { paused = game.paused = false; showOnly(); }
@@ -445,6 +476,7 @@ window.addEventListener('keydown', (e) => {
     else if (e.code === 'Escape') $('btnSelectBack').click();
     return;
   }
+  if (e.code === 'Escape' && !$('settings').classList.contains('hidden')) { closeSettings(); return; }
   if (state === 'menu' && e.code === 'Escape' && !$('confirm').classList.contains('hidden')) { $('btnConfirmNo').click(); return; }
   if (state !== 'game') return;
   if (e.code === 'Escape') {

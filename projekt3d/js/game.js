@@ -9,6 +9,7 @@ import { ITEMS } from './items.js';
 import { EnemyManager } from './enemies.js';
 import { PlayerStats } from './stats.js';
 import { createMountain, mountainHeight } from './mountain.js';
+import { loadGfx } from './graphics.js';
 
 const EDGE = 1.5; // Abstand zum Kartenrand
 
@@ -290,10 +291,53 @@ export class Game {
     }, { passive: true });
   }
 
+  // ---- Grafik ------------------------------------------------------------------------
+  // view = Sichtweite in m (Nebel + nichts dahinter), objects = nur die nächsten N Objekte (0 = alle)
+  setGraphics(g) {
+    this.gfx = g;
+    const near = Math.min(250, g.view * 0.2), far = g.view;
+    this.scene.fog.near = near; this.scene.fog.far = far;
+    this.terrain.setFog(near, far);
+    this.enemies.viewDist = g.view;
+    this._cullT = 0;
+  }
+
+  // Zählt Bäume, Gras, Dorf-Objekte und Zombies als Objekte, zeigt nur die nächsten N und nichts hinter der Sichtweite
+  _cull() {
+    const g = this.gfx ?? (this.gfx = loadGfx());
+    const cx = this.camera.position.x, cz = this.camera.position.z;
+    const list = [];   // { o: Object3D | Zombie, d, n }
+    for (const c of this.forest?.chunks ?? []) {
+      const u = c.userData, d = Math.max(0, Math.hypot(cx - u.cx, cz - u.cz) - u.size * 0.7);
+      const range = Math.min(g.view, u.tag === 'grass' ? this.forest.grassView : Infinity);
+      if (d >= range) { c.visible = false; continue; }
+      list.push({ o: c, d, n: u.n });
+    }
+    for (const p of this.village?.props ?? []) {
+      const d = Math.hypot(cx - p.position.x, cz - p.position.z);
+      if (d >= g.view) { p.visible = false; continue; }
+      list.push({ o: p, d, n: 1 });
+    }
+    for (const e of this.enemies.list) {
+      const d = Math.hypot(cx - e.x, cz - e.z);
+      if (d >= g.view) { if (e.state === 'idle') { e.culled = true; } else e.culled = false; continue; }
+      list.push({ o: e, d, n: 1 });
+    }
+    list.sort((a, b) => a.d - b.d);
+    let used = 0;
+    for (const it of list) {
+      const show = !g.objects || used < g.objects;   // der letzte Block darf überstehen
+      used += it.n;
+      if (it.o.holder) it.o.culled = !show; else it.o.visible = show;
+    }
+    this.drawnObjects = Math.min(used, g.objects || used);
+  }
+
   // ---- Update ----------------------------------------------------------------------
   update(dt) {
     this.npc?.update(dt);
-    this.forest?.update(this.camera.position.x, this.camera.position.z);   // Gras nur in der Nähe zeichnen
+    this._cullT = (this._cullT ?? 0) - dt;
+    if (this._cullT <= 0) { this._cullT = 0.2; this._cull(); }   // Sichtweite und Objekt-Limit
     if (this.mode === 'backdrop') { this._updateBackdrop(dt); return; }
     this._updatePlay(dt);
   }

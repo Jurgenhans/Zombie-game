@@ -40,6 +40,7 @@
       <p class="subtitle">Abenteuer-Prototyp</p>
       <button id="btnNew" class="btn primary">Neues Spiel</button>
       <button id="btnLoad" class="btn">Spiel laden</button>
+      <button id="btnSettings" class="btn">Einstellungen</button>
       <button class="btn js-fs touch-only">Vollbild</button>
       <p id="loadHint" class="hint"></p>
     </div>
@@ -221,9 +222,26 @@
       <div class="col">
         <button id="btnResume" class="btn primary">Weiter</button>
         <button id="btnSave" class="btn">Speichern</button>
+        <button id="btnSettingsPause" class="btn">Einstellungen</button>
         <button class="btn js-fs touch-only">Vollbild an/aus</button>
         <button id="btnToMenu" class="btn">Zum Hauptmenü</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Grafik-Einstellungen -->
+  <div id="settings" class="screen modal hidden">
+    <div class="dialog settings">
+      <h2>Grafik</h2>
+      <div class="row presets" id="gfxPresets"></div>
+      <label class="slider">Sichtweite: <b id="gfxViewVal"></b>
+        <input id="gfxView" type="range">
+      </label>
+      <label class="slider">Objekte (nächste): <b id="gfxObjVal"></b>
+        <input id="gfxObj" type="range">
+      </label>
+      <p class="hint">Weniger Sichtweite und weniger Objekte machen das Spiel auf schwachen Geräten flüssiger. Gezählt werden Bäume, Gras, Dorf-Objekte und Zombies; es werden immer die nächsten gezeichnet.</p>
+      <button id="btnSettingsClose" class="btn primary">Fertig</button>
     </div>
   </div>
 

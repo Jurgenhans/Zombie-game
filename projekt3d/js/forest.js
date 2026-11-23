@@ -121,7 +121,7 @@ export function createForest({ trees, grass }, clear) {
       const holder = new THREE.Group();
       let cx = 0, cz = 0;
       for (const p of items) { cx += p.x; cz += p.z; }
-      holder.userData = { cx: cx / items.length, cz: cz / items.length, size: chunkSize, tag };
+      holder.userData = { cx: cx / items.length, cz: cz / items.length, size: chunkSize, tag, n: items.length };
       models.forEach((parts, t) => {
         const of = items.filter((p) => p.type === t);
         if (!of.length) return;
@@ -141,7 +141,7 @@ export function createForest({ trees, grass }, clear) {
     }
     return out;
   };
-  build(treeList, trees, TREE_CHUNK, 'tree');
+  const treeChunks = build(treeList, trees, TREE_CHUNK, 'tree');
   const grassChunks = build(grassList, grass, GRASS_CHUNK, 'grass');
 
   // 3) Kollision: Stämme in einem Raster (10 m), damit die Abfrage schnell ist
@@ -154,6 +154,8 @@ export function createForest({ trees, grass }, clear) {
 
   return {
     group,
+    chunks: [...treeChunks, ...grassChunks],   // Blöcke mit userData {cx, cz, size, tag, n}
+    grassView: GRASS_VIEW,
     count: { trees: treeList.length, grass: grassList.length },
     // Gras nur in der Nähe des Spielers zeichnen
     update(px, pz) {

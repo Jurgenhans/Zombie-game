@@ -122,6 +122,7 @@ export function createTerrain({ biomes, splat, maxAniso }) {
   return {
     mesh,
     splatData,
+    setFog(near, far) { uniforms.uFogNear.value = near; uniforms.uFogFar.value = far; },
     setCamera(p) { uniforms.uCam.value.copy(p); },
     setGrid(on) { uniforms.uGrid.value = on ? 1 : 0; },
     get gridOn() { return uniforms.uGrid.value > 0.5; },

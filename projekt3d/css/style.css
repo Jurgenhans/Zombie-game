@@ -316,3 +316,11 @@ body.touch .npc-prompt kbd { display: none; }
 .shop-do { width: 100%; margin: 0; }
 .shop-msg { min-height: 1.4rem; margin-top: 0.6rem; text-align: center; font-size: 0.9rem; color: #9be8a8; }
 .shop-msg.warn { color: var(--danger); }
+
+/* ---------- Grafik-Einstellungen ---------- */
+.settings { width: min(92vw, 420px); }
+.settings .presets { margin-bottom: 1rem; }
+.settings .slider { display: block; text-align: left; margin: 0.6rem 0; font-size: 1rem; }
+.settings .slider b { color: var(--gold); }
+.settings input[type=range] { width: 100%; margin-top: 0.4rem; accent-color: var(--gold); }
+.settings .btn.active { background: rgba(255, 200, 60, 0.25); border-color: var(--gold); }
