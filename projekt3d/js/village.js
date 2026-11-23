@@ -28,7 +28,9 @@ const NAMES = [
   'props_signpost_01', 'props_wheelbarrow_01', 'props_water_trough_01', 'props_sack_01', 'props_basket_01',
   'interiors_woodpile_01', 'nature_bush_01', 'nature_flowers_01',
   'food_produce_crate_01', 'food_grain_sack_01', 'food_cask_01',
+  'wall_modular', 'wall_arch', 'wall_column',   // Dorfmauer (Modular Dungeons Pack)
 ];
+const LIFT = new Set(['wall_modular']);          // Ursprung liegt in der Mitte statt am Boden: Modell auf den Boden heben
 
 const loader = new GLTFLoader();
 
@@ -42,6 +44,10 @@ export async function loadVillage() {
       if (m.map) { m.map.magFilter = m.map.minFilter = THREE.NearestFilter; m.map.generateMipmaps = false; }   // Palette: scharfe Farben
     });
     gltf.scene.updateMatrixWorld(true);
+    if (LIFT.has(n)) {
+      const b0 = new THREE.Box3().setFromObject(gltf.scene), wrap = new THREE.Group();
+      gltf.scene.position.y -= b0.min.y; wrap.add(gltf.scene); wrap.updateMatrixWorld(true); gltf.scene = wrap;
+    }
     const box = new THREE.Box3().setFromObject(gltf.scene), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
     models[n] = { scene: gltf.scene, w: size.x, d: size.z, h: size.y, cx: c.x, cz: c.z };   // cx/cz: Mitte des Modells (zum Drehen um die Mitte)
   }));
@@ -187,24 +193,32 @@ export function createVillage(models) {
   put('props_basket_01', gX + 10.2, gZ + 10.6, 0.5);
 
   // ---- Dorfmauer ------------------------------------------------------------------------------------------------------
-  // Es gibt kein Mauer- oder Tormodell, deshalb besteht die Mauer aus dem Holzzaun in doppelter Größe (2 m lang, 2,5 m hoch).
-  // Rechteck 90 m x 168 m um das Dorf, Eingang (10 m breit) in der Mitte der Südseite, auf der Dorfstraße Richtung Feld 45.
-  const WS = 2;                                                    // Maßstab des Zaunteils
-  const WX0 = CX - 45, WX1 = CX + 45, WZ0 = Z0 + 130, WZ1 = Z_END - 2;
-  const GATE = 5;                                                  // halbe Breite des Eingangs (Meter)
+  // Steinmauer aus dem Modular Dungeons Pack: Wall Modular (2 m, hier Maßstab 2 = 4 m lang und hoch), Säulen an den Ecken und
+  // ein Torbogen (Arch) als Eingang. Rechteck 96 m x 168 m um das Dorf, Eingang (8 m breit, Bogen-Öffnung ca. 4,4 m) in der Mitte
+  // der Südseite, auf der Dorfstraße Richtung Feld 45.
+  const WS = 2, WL = 2 * WS;                                       // Maßstab und Länge eines Mauerteils (4 m)
+  const WX0 = CX - 48, WX1 = CX + 48, WZ0 = Z0 + 130, WZ1 = Z_END - 2;
+  const GATE = 4;                                                  // halbe Breite des Eingangs (Meter)
   const wallRun = (x0, z0, x1, z1, gate = false) => {
     const alongX = z0 === z1, len = Math.abs(alongX ? x1 - x0 : z1 - z0), sgn = Math.sign(alongX ? x1 - x0 : z1 - z0);
-    for (let i = 0; i < len / WS; i++) {
-      const t = (i + 0.5) * WS, px = alongX ? x0 + sgn * t : x0, pz = alongX ? z0 : z0 + sgn * t;
+    for (let i = 0; i < len / WL; i++) {
+      const t = (i + 0.5) * WL, px = alongX ? x0 + sgn * t : x0, pz = alongX ? z0 : z0 + sgn * t;
       if (gate && Math.abs(px - CX) < GATE) continue;
-      put('props_fence_wood_01', px, pz, alongX ? 0 : Math.PI / 2, { solid: 'box', s: WS });
+      put('wall_modular', px, pz, alongX ? 0 : Math.PI / 2, { solid: 'box', s: WS });
     }
   };
   wallRun(WX0, WZ0, WX1, WZ0);                                     // Nord
   wallRun(WX0, WZ1, WX1, WZ1, true);                               // Süd, mit Eingang
   wallRun(WX0, WZ0, WX0, WZ1);                                     // West
   wallRun(WX1, WZ0, WX1, WZ1);                                     // Ost
-  for (const [x, z] of [[WX0, WZ0], [WX1, WZ0], [WX0, WZ1], [WX1, WZ1], [CX - GATE, WZ1], [CX + GATE, WZ1]]) put('props_fence_wood_end_01', x, z, 0, { s: WS });   // Eckpfosten und Torpfosten
+  for (const [x, z] of [[WX0, WZ0], [WX1, WZ0], [WX0, WZ1], [WX1, WZ1]]) put('wall_column', x, z, 0, { solid: 'circle' });   // Eckpfeiler
+  // Torbogen: 8 m breit (Maßstab 1,95); die Öffnung (+-1,12 m x Maßstab) bleibt frei, nur die beiden Pfeiler sind fest
+  const AS = 1.95;
+  put('wall_arch', CX, WZ1, 0, { s: AS });
+  for (const sg of [-1, 1]) {
+    const a = CX + sg * 1.12 * AS, b = CX + sg * 2.05 * AS;
+    boxes.push({ x0: Math.min(a, b), x1: Math.max(a, b), z0: WZ1 - 0.5 * AS, z1: WZ1 + 0.5 * AS });
+  }
 
   // ---- Kollision --------------------------------------------------------------------------------------------------
   const MINX = X0 + 20, MAXX = X0 + FIELD_SIZE - 20;   // grober Schnelltest: nur im Dorfbereich prüfen
