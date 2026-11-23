@@ -96,6 +96,9 @@ Einstellungen (Totzone, Empfindlichkeit, Joystick-Bereich): `TOUCH` in `js/confi
   - Verkaufen: 100 Tränke = 25 Credits (halber Preis, `POTION_SELL_PRICE`).
 - **Trank trinken:** Taste **1**, Klick auf die Trank-Anzeige oben links oder (Handy) Trank-Slot 1. Ein Trank heilt 30 % der max. HP, mindestens 30 (`POTION_HEAL_PCT`). Bei vollen HP wird keiner verbraucht.
 
+## Berg (Feld 36)
+Östlich vom Dorf liegt auf Feld 36 ein Berg (ca. 45–50 m hoch, Gras → Fels → Schnee). `js/mountain.js` enthält die Höhenfunktion `mountainHeight(x, z)` (am Feldrand 0, also keine Kante) und das Gitter-Mesh. Spieler, Schatten, Kamera, Pfeile/Zauber und Zombies (`EnemyManager.groundY`) folgen der Bodenhöhe. Der Rest der Welt bleibt flach.
+
 ## Startpunkt
 - Ein neues Spiel beginnt im **Dorf** (Feld 35): auf der Dorfstraße direkt vor dem Dorfplatz, mit Blick nach Norden zu Brunnen und Händler (`VILLAGE_START` in `js/village.js`). Auch nach dem Tod (0 HP) wirst du dort wiederbelebt.
 - Der Zombie-Haufen steht weiter in der Waldlichtung in Feld 45. Von der Dorfstraße führt der Weg nach Süden (Dorfeingang, durch Feld 45) dorthin.

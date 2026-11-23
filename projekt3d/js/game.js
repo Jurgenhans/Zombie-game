@@ -8,6 +8,7 @@ import { createActor } from './characters.js';
 import { ITEMS } from './items.js';
 import { EnemyManager } from './enemies.js';
 import { PlayerStats } from './stats.js';
+import { createMountain, mountainHeight } from './mountain.js';
 
 const EDGE = 1.5; // Abstand zum Kartenrand
 
@@ -20,6 +21,7 @@ export class Game {
 
     this.terrain = createTerrain({ biomes, splat, maxAniso: renderer.capabilities.getMaxAnisotropy() });
     this.scene.add(this.terrain.mesh);
+    this.scene.add(createMountain());   // Berg auf Feld 36
     this.sky = createSky();
     this.scene.add(this.sky);
 
@@ -63,6 +65,7 @@ export class Game {
     this.cam = { yaw: 0, pitch: 0.35, dist: 6.5 };
     this.keys = new Set();
     this.enemies = new EnemyManager(this.scene);
+    this.enemies.groundY = mountainHeight;
     this.stats = new PlayerStats();     // Level, HP, Kills
     this.pendingDeath = false;
     this.enemies.onKill = () => {
@@ -174,7 +177,7 @@ export class Game {
   _release(w) {
     const { x, z, yaw } = this.player, dx = Math.sin(yaw), dz = Math.cos(yaw), damage = this._damage(w);
     if (!w || w.kind === 'melee') this.enemies.meleeHit({ x, z, dx, dz, range: w?.range ?? 1.8, damage });
-    else this.enemies.shoot({ x: x + dx * 0.7, y: 1.35, z: z + dz * 0.7, dx, dz, speed: w.speed, damage, kind: w.projectile });
+    else this.enemies.shoot({ x: x + dx * 0.7, y: mountainHeight(x, z) + 1.35, z: z + dz * 0.7, dx, dz, speed: w.speed, damage, kind: w.projectile });
   }
 
   // Ein Zombie trifft den Spieler (Verteidigung-Skill senkt den Schaden)
@@ -362,16 +365,17 @@ export class Game {
   _syncActor() {
     if (!this.actor) return;
     const { x, z, yaw } = this.player;
-    this.actor.group.position.set(x, 0, z);
+    const gy = mountainHeight(x, z);
+    this.actor.group.position.set(x, gy, z);
     this.actor.group.rotation.y = yaw;
-    this.shadow.position.x = x; this.shadow.position.z = z;
+    this.shadow.position.set(x, gy + 0.03, z);
 
     // Kamera hinter dem Spieler
     const { yaw: cy, pitch, dist } = this.cam;
-    const tx = x, ty = 1.5, tz = z;
+    const tx = x, ty = gy + 1.5, tz = z;
     this.camera.position.set(
       tx + Math.sin(cy) * Math.cos(pitch) * dist,
-      Math.max(0.5, ty + Math.sin(pitch) * dist),
+      Math.max(mountainHeight(tx + Math.sin(cy) * Math.cos(pitch) * dist, tz + Math.cos(cy) * Math.cos(pitch) * dist) + 0.5, ty + Math.sin(pitch) * dist),
       tz + Math.cos(cy) * Math.cos(pitch) * dist
     );
     this.camera.lookAt(tx, ty, tz);

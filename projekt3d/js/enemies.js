@@ -43,6 +43,7 @@ export class EnemyManager {
     this.scene = scene;
     this.list = [];
     this.shots = [];
+    this.groundY = null;   // (x, z) => Bodenhöhe (Berg); null = flach
     this.onKill = null;   // wird aufgerufen, wenn ein Zombie besiegt wurde
     this.onPlayerHit = null;   // (schaden, zombie): ein Zombie schlägt den Spieler
   }
@@ -118,11 +119,13 @@ export class EnemyManager {
     this._place(e);
   }
 
-  _place(e) { e.holder.position.set(e.x, e.holder.position.y, e.z); e.holder.rotation.y = e.yaw; }
+  _ground(x, z) { return this.groundY ? this.groundY(x, z) : 0; }
+
+  _place(e) { e.holder.position.set(e.x, this._ground(e.x, e.z) + (e.sink || 0), e.z); e.holder.rotation.y = e.yaw; }
 
   _reset(e) {
     e.x = e.bx; e.z = e.bz; e.yaw = e.byaw; e.hp = e.type.hp; e.state = 'idle'; e.deathT = 0; e.flash = 0;
-    e.model.group.rotation.x = 0; e.holder.position.y = 0;
+    e.model.group.rotation.x = 0; e.sink = 0;
     e.bg.visible = e.fill.visible = false;
     this._place(e);
   }
@@ -228,7 +231,8 @@ export class EnemyManager {
       e.model.group.rotation.x = -ease(Math.min(1, e.deathT / 0.7)) * (Math.PI / 2);   // fällt nach hinten
       e.model.group.position.y = ease(Math.min(1, e.deathT / 0.7)) * 0.12;
       r.armL.rotation.x = R ? 0.5 : -0.4; r.armR.rotation.x = R ? 0.2 : -0.9; r.legL.rotation.x = 0.1; r.legR.rotation.x = -0.15;
-      if (e.deathT > 12) e.holder.position.y = -(e.deathT - 12) * 0.12;             // versinkt
+      e.sink = e.deathT > 12 ? -(e.deathT - 12) * 0.12 : 0;
+      this._place(e);             // versinkt
       if (e.deathT > RESPAWN) this._reset(e);
       return;
     }
@@ -277,7 +281,7 @@ export class EnemyManager {
       const nx = s.x + s.dx * s.speed * dt, nz = s.z + s.dz * s.speed * dt;
       let hitZ = null;
       for (const e of this.list) {
-        if (e.state === 'dead' || s.y > e.type.height) continue;
+        if (e.state === 'dead' || s.y - this._ground(e.x, e.z) > e.type.height) continue;
         // Abstand des Zombies zur Flugstrecke dieses Bildes
         const sx = nx - s.x, sz = nz - s.z, l2 = sx * sx + sz * sz || 1;
         const t = Math.min(1, Math.max(0, ((e.x - s.x) * sx + (e.z - s.z) * sz) / l2));
