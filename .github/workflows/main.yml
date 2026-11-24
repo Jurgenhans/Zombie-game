@@ -11,6 +11,8 @@ on:
       - 'game.js'
       - 'style.css'
       - 'assets/**'
+      - 'vendor/**'
+      - '.github/workflows/main.yml'
 
 permissions:
   contents: read
@@ -55,6 +57,18 @@ jobs:
 
           mkdir -p www
           cp -a "$GAME_DIR"/. www/
+          rm -rf www/.git www/.github www/*.zip
+
+      - name: Three.js einbinden (offline im APK)
+        run: |
+          mkdir -p /tmp/three && cd /tmp/three
+          npm init -y >/dev/null
+          npm install three@0.160.0
+          mkdir -p "$GITHUB_WORKSPACE/www/vendor/addons/loaders" "$GITHUB_WORKSPACE/www/vendor/addons/utils"
+          cp node_modules/three/build/three.module.js "$GITHUB_WORKSPACE/www/vendor/three.module.js"
+          cp node_modules/three/examples/jsm/loaders/GLTFLoader.js "$GITHUB_WORKSPACE/www/vendor/addons/loaders/"
+          cp node_modules/three/examples/jsm/utils/BufferGeometryUtils.js "$GITHUB_WORKSPACE/www/vendor/addons/utils/"
+          # GLTFLoader importiert 'three' -> per Importmap aufgelöst
 
       - name: Capacitor einrichten
         run: |
@@ -71,6 +85,35 @@ jobs:
 
           npx cap add android
           npx cap sync android
+
+          # Querformat + Vollbild (Immersive)
+          sed -i 's|<activity|<activity android:screenOrientation="sensorLandscape"|' android/app/src/main/AndroidManifest.xml
+          MAIN=$(find android/app/src/main/java -name MainActivity.java)
+          PKG=$(grep -m1 '^package' "$MAIN")
+          cat > "$MAIN" <<JAVA
+          $PKG
+
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.WindowManager;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle b) {
+              super.onCreate(b);
+              getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
+            @Override
+            public void onWindowFocusChanged(boolean hasFocus) {
+              super.onWindowFocusChanged(hasFocus);
+              if (hasFocus) getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN |
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+            }
+          }
+          JAVA
 
       - name: Android APK bauen
         run: |

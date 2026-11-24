@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Dead City</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="damage"></div>
+  <div id="crosshair"><i></i><i></i><i></i><i></i><b id="hitmark"></b></div>
+
+  <div id="topLeft">
+    <div class="label">LEBEN</div>
+    <div id="hpbar"><div id="hpfill"></div><span id="hptext">100</span></div>
+  </div>
+  <div id="topCenter">
+    <div>WELLE <b id="wave">–</b></div>
+    <div>ZOMBIES <b id="remaining">0</b></div>
+  </div>
+  <div id="topRight">
+    <div class="label">BESIEGT</div>
+    <div id="kills">0</div>
+  </div>
+
+  <div id="weaponInfo">
+    <div id="wname">PISTOLE</div>
+    <div id="ammo"><b id="mag">12</b><span> / </span><span id="reserve">60</span></div>
+    <div id="slots"></div>
+  </div>
+
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <button id="btnSprint" class="btn">SPRINT</button>
+  <button id="btnJump" class="btn">SPRUNG</button>
+  <button id="btnReload" class="btn">NACHLADEN</button>
+  <button id="btnSwap" class="btn">WAFFE</button>
+  <button id="btnFire" class="btn">FEUER</button>
+  <div id="toast"></div>
+</div>
+
+<div id="startScreen" class="screen">
+  <h1>DEAD CITY</h1>
+  <p>Verlassene Stadt · 250 × 250 m</p>
+  <button id="btnStart" class="big">SPIEL STARTEN</button>
+  <small>Links: Joystick · Rechts wischen: Umsehen<br>Am PC: WASD, Maus, Leertaste, Shift, R, 1–4</small>
+</div>
+
+<div id="gameOver" class="screen hidden">
+  <h1 class="red">GAME OVER</h1>
+  <p>Besiegte Zombies: <b id="goKills">0</b> · Welle: <b id="goWave">–</b></p>
+  <button id="btnRestart" class="big">NEUSTART</button>
+</div>
+
+<div id="loading" class="screen"><p id="loadText">Lade …</p></div>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>

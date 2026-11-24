@@ -1,0 +1,53 @@
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,Roboto,sans-serif;color:#fff}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hidden{display:none!important}
+#hud{position:fixed;inset:0;pointer-events:none}
+#hud *{pointer-events:none}
+#hud .btn{pointer-events:auto}
+#damage{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(200,0,0,.75));opacity:0;transition:opacity .35s}
+#crosshair{position:absolute;left:50%;top:50%;width:0;height:0}
+#crosshair i{position:absolute;background:rgba(255,255,255,.85);box-shadow:0 0 2px #000}
+#crosshair i:nth-child(1){left:-1px;top:-16px;width:2px;height:9px}
+#crosshair i:nth-child(2){left:-1px;top:7px;width:2px;height:9px}
+#crosshair i:nth-child(3){top:-1px;left:-16px;height:2px;width:9px}
+#crosshair i:nth-child(4){top:-1px;left:7px;height:2px;width:9px}
+#hitmark{position:absolute;left:-14px;top:-14px;width:28px;height:28px;opacity:0;transition:opacity .15s}
+#hitmark::before,#hitmark::after{content:"";position:absolute;left:12px;top:-4px;width:3px;height:36px;background:#fff;transform:rotate(45deg)}
+#hitmark::after{transform:rotate(-45deg)}
+#hitmark.on{opacity:1;transition:none}
+#hitmark.kill::before,#hitmark.kill::after{background:#f33}
+.label{font-size:11px;letter-spacing:2px;opacity:.7}
+#topLeft{position:absolute;left:max(18px,env(safe-area-inset-left));top:14px;width:230px}
+#hpbar{position:relative;height:22px;background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.6);border-radius:4px;overflow:hidden}
+#hpfill{height:100%;width:100%;background:linear-gradient(#d33,#811);transition:width .2s}
+#hptext{position:absolute;inset:0;text-align:center;font-weight:700;line-height:18px;text-shadow:0 0 3px #000}
+#topCenter{position:absolute;left:50%;top:12px;transform:translateX(-50%);text-align:center;font-size:15px;letter-spacing:2px;text-shadow:0 0 4px #000;background:rgba(0,0,0,.35);padding:6px 16px;border-radius:6px}
+#topCenter b{font-size:20px;color:#f66}
+#topRight{position:absolute;right:max(18px,env(safe-area-inset-right));top:12px;text-align:right;text-shadow:0 0 4px #000}
+#kills{font-size:34px;font-weight:800}
+#weaponInfo{position:absolute;right:max(18px,env(safe-area-inset-right));top:74px;text-align:right;text-shadow:0 0 4px #000}
+#wname{font-size:16px;letter-spacing:3px;opacity:.9}
+#ammo b{font-size:44px}
+#ammo span{font-size:20px;opacity:.8}
+#ammo.low b{color:#f55}
+#slots{display:flex;gap:6px;justify-content:flex-end;margin-top:4px}
+#slots i{width:26px;height:6px;background:rgba(255,255,255,.3);border-radius:3px}
+#slots i.on{background:#fc4}
+#joyBase{position:absolute;left:max(40px,env(safe-area-inset-left));bottom:40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.35)}
+#joyKnob{position:absolute;left:50px;top:50px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.4);border:2px solid rgba(255,255,255,.7)}
+.btn{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.6);background:rgba(20,20,20,.5);color:#fff;font-weight:700;font-size:12px;letter-spacing:1px;touch-action:none}
+.btn.down{background:rgba(255,255,255,.35)}
+#btnFire{right:max(30px,env(safe-area-inset-right));bottom:30px;width:120px;height:120px;font-size:16px;background:rgba(190,30,30,.55)}
+#btnJump{right:170px;bottom:34px;width:84px;height:84px}
+#btnReload{right:50px;bottom:170px;width:84px;height:84px}
+#btnSwap{right:148px;bottom:130px;width:70px;height:70px}
+#btnSprint{left:60px;bottom:220px;width:84px;height:84px}
+#btnSprint.on{background:rgba(255,200,40,.5)}
+#toast{position:absolute;left:50%;top:30%;transform:translateX(-50%);font-size:20px;font-weight:700;text-shadow:0 0 6px #000;opacity:0;transition:opacity .4s}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,.78);text-align:center;z-index:5}
+.screen h1{font-size:64px;letter-spacing:8px;margin:0}
+.screen h1.red{color:#d22}
+.screen p{font-size:20px;margin:0;opacity:.85}
+.screen small{opacity:.6;line-height:1.6}
+.big{padding:18px 48px;font-size:22px;font-weight:800;letter-spacing:3px;color:#fff;background:#a22;border:2px solid #f66;border-radius:8px;touch-action:manipulation}
