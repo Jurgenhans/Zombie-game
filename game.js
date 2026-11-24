@@ -35,7 +35,8 @@ scene.fog = new THREE.Fog(SKY, 25, 130);
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 220);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
-scene.add(new THREE.HemisphereLight(0xb8c4d4, 0x3a3630, 1.25));
+const hemi = new THREE.HemisphereLight(0xb8c4d4, 0x3a3630, 1.25);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffe2b8, 1.1);
 sun.position.set(-60, 90, 40);
 scene.add(sun);
@@ -652,7 +653,7 @@ function shoot() {
   if (hitAny) { const hm = $('hitmark'); hm.className = 'on' + (killAny ? ' kill' : ''); clearTimeout(hm._t); hm._t = setTimeout(() => (hm.className = ''), 90); }
   // Rückstoß & Mündungsfeuer
   player.recoilKick += w.recoil * 30; player.pitch += w.recoil * (0.4 + rnd() * 0.5); player.yaw += rr(-1, 1) * w.recoil * 0.3; player.shake = Math.min(1, player.shake + w.recoil * 6);
-  flash.visible = true; flash.rotation.z = rnd() * 6; flash.scale.setScalar(w.pellets > 1 ? 1.8 : 1 + rnd() * 0.5); flashLight.intensity = 3; player.flashT = 0.05;
+  flash.visible = true; flash.rotation.z = rnd() * 6; flash.scale.setScalar(w.pellets > 1 ? 1.8 : 1 + rnd() * 0.5); flashLight.intensity = 22; player.flashT = 0.05;
   if (a.mag === 0 && a.reserve > 0) setTimeout(startReload, 250);
   updateHUD();
 }
@@ -673,7 +674,7 @@ function spawnZombie(x, z, opts = {}) {
     wander: new THREE.Vector3(x, 0, z), phase: rnd() * 6, stuckT: 0, lastP: new THREE.Vector3(x, 0, z), side: 0, dieT: 0, fall: rnd() < 0.5 ? -1 : 1, groanT: rr(3, 9),
     target: null, runner,
   };
-  root.position.copy(zb.pos); scene.add(root); zombies.push(zb); return zb;
+  root.position.copy(zb.pos); scene.add(root); applyShaderTo(root); zombies.push(zb); return zb;
 }
 function damageZombie(z, dmg, head, dir, at) {
   z.hp -= dmg; z.stun = 0.2; SFX.hit();
@@ -771,7 +772,7 @@ function spawnPickups() {
     const p = sp ? { x: sp.x + rr(-0.6, 0.6), z: sp.z + rr(-0.6, 0.6) } : randomSpawn(8, 110); const ammo = i % 3 !== 0;
     const m = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.28, 0.28), ammo ? ammoM : medM); m.add(b);
     if (!ammo) { const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.3), red), c2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.3), red); m.add(c1, c2); }
-    m.position.set(p.x, 0.6, p.z); scene.add(m); pickups.push({ m, ammo, t: 0, x: p.x, z: p.z });
+    m.position.set(p.x, 0.6, p.z); scene.add(m); applyShaderTo(m); pickups.push({ m, ammo, t: 0, x: p.x, z: p.z });
   }
 }
 function updatePickups(dt) {
@@ -790,7 +791,7 @@ function updatePickups(dt) {
 const input = { mx: 0, mz: 0, fire: false, fireQueued: false, sprint: false, jump: false, keys: {} };
 const joy = { id: null, cx: 0, cy: 0 }; const look = { id: null, x: 0, y: 0 };
 const joyBase = $('joyBase'), joyKnob = $('joyKnob');
-function lookDelta(dx, dy) { player.yaw -= dx * CONFIG.lookSensitivity; player.pitch = clamp(player.pitch - dy * CONFIG.lookSensitivity, -1.45, 1.45); }
+function lookDelta(dx, dy) { const k = CONFIG.lookSensitivity * settings.sens / 100; player.yaw -= dx * k; player.pitch = clamp(player.pitch - dy * k, -1.45, 1.45); }
 function joyUpdate(x, y) {
   let dx = x - joy.cx, dy = y - joy.cy; const R = 60, d = Math.hypot(dx, dy);
   if (d > R) { dx = dx / d * R; dy = dy / d * R; }
@@ -798,12 +799,12 @@ function joyUpdate(x, y) {
   input.mx = dx / R; input.mz = dy / R; // mz>0 = rückwärts
   if (d > R * 1.1) input.sprintAuto = true; else input.sprintAuto = false;
 }
-function joyReset() { joy.id = null; input.mx = input.mz = 0; input.sprintAuto = false; joyKnob.style.transform = 'translate(0,0)'; }
+function joyReset() { joy.id = null; input.mx = input.mz = 0; input.sprintAuto = false; joyKnob.style.transform = 'translate(0,0)'; joyBase.classList.add('idle'); joyBase.style.left = joyBase.style.top = joyBase.style.bottom = ''; }
 window.addEventListener('pointerdown', (e) => {
   if (e.target.closest && e.target.closest('.btn')) return;
   if (!gameRunning() || e.pointerType === 'mouse') return;
   if (e.clientX < window.innerWidth * 0.4 && joy.id === null) {
-    joy.id = e.pointerId; const r = joyBase.getBoundingClientRect(); joy.cx = r.left + r.width / 2; joy.cy = r.top + r.height / 2; joyUpdate(e.clientX, e.clientY);
+    joy.id = e.pointerId; joy.cx = e.clientX; joy.cy = e.clientY; joyBase.classList.remove('idle'); joyBase.style.left = (joy.cx - 75) + 'px'; joyBase.style.top = (joy.cy - 75) + 'px'; joyBase.style.bottom = 'auto'; joyUpdate(e.clientX, e.clientY);
   } else if (e.clientX >= window.innerWidth * 0.4 && look.id === null && e.pointerType !== 'mouse') {
     look.id = e.pointerId; look.x = e.clientX; look.y = e.clientY;
   }
@@ -818,8 +819,8 @@ window.addEventListener('pointerup', up); window.addEventListener('pointercancel
 let fireBtnPointer = null, fbx = 0, fby = 0;
 function bindBtn(id, down, upfn) {
   const b = $(id);
-  b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('down'); down(e); });
-  const end = (e) => { b.classList.remove('down'); if (upfn) upfn(e); };
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); if (editMode) return; b.classList.add('down'); down(e); });
+  const end = (e) => { b.classList.remove('down'); if (upfn && !editMode) upfn(e); };
   b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end);
 }
 bindBtn('btnFire', (e) => { input.fire = true; input.fireQueued = true; fireBtnPointer = e.pointerId; fbx = e.clientX; fby = e.clientY; }, () => { input.fire = false; fireBtnPointer = null; });
@@ -862,7 +863,7 @@ function hurtPlayer(d) {
 
 /* ---------------- Spielablauf ---------------- */
 let running = false;
-const gameRunning = () => running && !player.dead;
+const gameRunning = () => running && !player.dead && !paused;
 function resetGame() {
   zombies.forEach((z) => scene.remove(z.root)); zombies.length = 0;
   Object.assign(player, { hp: CONFIG.playerMaxHp, kills: 0, dead: false, vy: 0, reloading: false, fireCd: 0, yaw: 0, pitch: 0, recoilKick: 0, swapT: 0 });
@@ -879,11 +880,15 @@ function startGame() {
 $('btnStart').addEventListener('click', startGame);
 $('btnRestart').addEventListener('click', startGame);
 
-let last = performance.now();
+let last = performance.now(), lastRender = 0;
 function frame(now) {
   requestAnimationFrame(frame);
+  const minDt = 1000 / settings.fps, el = now - lastRender;
+  if (el < minDt - 1) return;
+  lastRender = now - (el % minDt);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (running) update(dt);
+  if (running && !paused) update(dt);
+  sky.position.copy(camera.position); stars.position.copy(camera.position); stars.rotation.y += dt * 0.003;
   updateEffects(dt);
   renderer.render(scene, camera);
 }
@@ -933,6 +938,142 @@ function update(dt) {
   $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.toSpawn : 0);
 }
 
+/* ---------------- Optionen: Steuerung, Grafik, Shader ---------------- */
+const SETTINGS_KEY = 'deadcity_settings_v1';
+const settings = { night: false, fps: 60, res: 1, shader: 'off', gloss: 100, sens: 100, btnScale: 100, layout: {} };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { /* ignorieren */ }
+const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignorieren */ } };
+let paused = false, editMode = false;
+
+/* Himmel: Farbverlauf-Kuppel, Sterne, Mond/Sonne */
+const skyGeo = new THREE.SphereGeometry(200, 24, 14);
+skyGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(skyGeo.attributes.position.count * 3), 3));
+const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+sky.renderOrder = -2; sky.frustumCulled = false; scene.add(sky);
+const starGeo = new THREE.BufferGeometry(), SN = 1500, sp = new Float32Array(SN * 3), sc = new Float32Array(SN * 3);
+for (let i = 0; i < SN; i++) {
+  const u = rnd() * 6.2832, v = Math.pow(rnd(), 0.8) * 0.98 + 0.02, r = Math.sqrt(1 - v * v), b = 0.45 + rnd() * 0.55, tint = rnd();
+  sp.set([Math.cos(u) * r * 190, v * 190, Math.sin(u) * r * 190], i * 3);
+  sc.set([b * (tint < 0.2 ? 1 : 0.85), b * (tint < 0.2 ? 0.85 : 0.92), b * (tint > 0.8 ? 1 : 0.9) ], i * 3);
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3)); starGeo.setAttribute('color', new THREE.BufferAttribute(sc, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, vertexColors: true, fog: false, transparent: true, depthWrite: false }));
+stars.renderOrder = -1; stars.frustumCulled = false; scene.add(stars);
+const orb = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, side: THREE.DoubleSide, depthWrite: false }));
+const orbGlow = new THREE.Mesh(new THREE.CircleGeometry(2.6, 28), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending }));
+orb.renderOrder = orbGlow.renderOrder = -1; orb.frustumCulled = orbGlow.frustumCulled = false; sky.add(orb); sky.add(orbGlow);
+const torch = new THREE.SpotLight(0xfff0d0, 0, 55, 0.5, 0.5, 1.4); // Taschenlampe (nachts)
+torch.position.set(0.15, -0.15, 0); torch.target.position.set(0, 0, -6); camera.add(torch); camera.add(torch.target);
+
+function paintSky(horizon, zenith) {
+  const pos = skyGeo.attributes.position, col = skyGeo.attributes.color, h = new THREE.Color(horizon), z = new THREE.Color(zenith), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) { const t = Math.pow(Math.max(0, pos.getY(i) / 200), 0.6); c.copy(h).lerp(z, t); col.setXYZ(i, c.r, c.g, c.b); }
+  col.needsUpdate = true;
+}
+function applyTime() {
+  const n = settings.night;
+  if (n) {
+    scene.fog.color.setHex(0x070b14); scene.fog.near = 4; scene.fog.far = 85; scene.background.setHex(0x070b14);
+    hemi.color.setHex(0x34487a); hemi.groundColor.setHex(0x0c0c14); hemi.intensity = 0.85;
+    sun.color.setHex(0x8aa4ff); sun.intensity = 0.5; paintSky(0x0a1224, 0x01020a);
+    orb.material.color.setHex(0xe6edff); orb.scale.setScalar(9); orb.position.set(-50, 95, -150); orbGlow.material.color.setHex(0x8aa4ff); orbGlow.scale.setScalar(9); orbGlow.position.copy(orb.position);
+    torch.intensity = 70;
+  } else {
+    scene.fog.color.setHex(0x7d8893); scene.fog.near = 25; scene.fog.far = 130; scene.background.setHex(0x7d8893);
+    hemi.color.setHex(0xb8c4d4); hemi.groundColor.setHex(0x3a3630); hemi.intensity = 1.25;
+    sun.color.setHex(0xffe2b8); sun.intensity = 1.1; paintSky(0x8d98a3, 0x4f7096);
+    orb.material.color.setHex(0xfff2c8); orb.scale.setScalar(13); orb.position.set(60, 100, -150); orbGlow.material.color.setHex(0xffe0a0); orbGlow.scale.setScalar(13); orbGlow.position.copy(orb.position);
+    torch.intensity = 0;
+  }
+  stars.visible = n;
+}
+
+/* Shader: Glanz-Materialien + Farbfilter */
+const SHADERS = {
+  off:    { phong: false, shin: 0,   spec: 0,        filter: '' },
+  gloss:  { phong: true,  shin: 70,  spec: 0x666666, filter: 'contrast(1.05) saturate(1.1)' },
+  wet:    { phong: true,  shin: 140, spec: 0xaabbcc, filter: 'contrast(1.1) saturate(1.05) brightness(.97)' },
+  cinema: { phong: true,  shin: 45,  spec: 0x3a3a3a, filter: 'contrast(1.2) saturate(1.35) sepia(.15)' },
+  horror: { phong: false, shin: 0,   spec: 0,        filter: 'grayscale(.6) contrast(1.3) brightness(.9)' },
+};
+const phongCache = new Map();
+function phongOf(m) {
+  let p = phongCache.get(m);
+  if (!p) { p = new THREE.MeshPhongMaterial({ color: m.color, map: m.map, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits }); p.userData.orig = m; phongCache.set(m, p); }
+  return p;
+}
+function applyShaderTo(root) {
+  const cfg = SHADERS[settings.shader] || SHADERS.off;
+  const swap = (m) => {
+    if (m.isMeshPhongMaterial && m.userData.orig) { if (!cfg.phong) return m.userData.orig; m.shininess = cfg.shin; m.specular.setHex(cfg.spec).multiplyScalar(settings.gloss / 100); return m; }
+    if (m.isMeshLambertMaterial && cfg.phong) { const p = phongOf(m); p.shininess = cfg.shin; p.specular.setHex(cfg.spec).multiplyScalar(settings.gloss / 100); return p; }
+    return m;
+  };
+  root.traverse((o) => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material); });
+}
+function applyShader() { applyShaderTo(scene); canvas.style.filter = (SHADERS[settings.shader] || SHADERS.off).filter; }
+
+function applyRes() { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.res)); renderer.setSize(window.innerWidth, window.innerHeight); }
+
+/* Tasten-Layout */
+const BTN_IDS = ['btnFire', 'btnJump', 'btnReload', 'btnSwap', 'btnSprint'];
+function applyLayout() {
+  $('hud').style.setProperty('--bs', settings.btnScale / 100);
+  for (const id of BTN_IDS) {
+    const f = settings.layout[id], el = $(id); if (!f) continue;
+    el.style.left = clamp(f.x * window.innerWidth, 0, window.innerWidth - 40) + 'px'; el.style.top = clamp(f.y * window.innerHeight, 0, window.innerHeight - 40) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
+  }
+}
+window.addEventListener('resize', applyLayout);
+let drag = null;
+for (const id of BTN_IDS) {
+  const b = $(id);
+  b.addEventListener('pointerdown', (e) => { if (!editMode) return; drag = { id, pid: e.pointerId, dx: e.clientX - b.getBoundingClientRect().left, dy: e.clientY - b.getBoundingClientRect().top }; });
+  b.addEventListener('pointermove', (e) => {
+    if (!drag || drag.id !== id || drag.pid !== e.pointerId) return;
+    const r = b.getBoundingClientRect(), x = clamp(e.clientX - drag.dx, 0, window.innerWidth - r.width), y = clamp(e.clientY - drag.dy, 0, window.innerHeight - r.height);
+    b.style.left = x + 'px'; b.style.top = y + 'px'; b.style.right = 'auto'; b.style.bottom = 'auto'; settings.layout[id] = { x: x / window.innerWidth, y: y / window.innerHeight };
+  });
+  const endDrag = () => { if (drag && drag.id === id) { drag = null; saveSettings(); } };
+  b.addEventListener('pointerup', endDrag); b.addEventListener('pointercancel', endDrag);
+}
+function resetLayout() {
+  settings.layout = {}; settings.btnScale = 100; $('optBtnScale').value = 100;
+  for (const id of BTN_IDS) { const el = $(id); el.style.left = el.style.top = el.style.right = el.style.bottom = ''; }
+  applyLayout(); saveSettings();
+}
+
+/* Menü */
+function setPaused(p) { paused = p; if (p) { input.fire = false; input.jump = false; input.fireQueued = false; joyReset(); look.id = null; } }
+function openOptions() { setPaused(true); $('options').classList.remove('hidden'); }
+function closeOptions() { $('options').classList.add('hidden'); if (!editMode) setPaused(false); }
+function setEdit(on) {
+  editMode = on; $('hud').classList.toggle('editing', on); $('editBar').classList.toggle('hidden', !on);
+  if (on) { $('options').classList.add('hidden'); setPaused(true); } else setPaused(false);
+}
+$('btnOptions').addEventListener('click', openOptions);
+$('btnCloseOptions').addEventListener('click', closeOptions);
+$('btnEditLayout').addEventListener('click', () => setEdit(true));
+$('btnEditDone').addEventListener('click', () => setEdit(false));
+$('btnEditReset').addEventListener('click', resetLayout);
+$('btnResetLayout').addEventListener('click', resetLayout);
+document.querySelectorAll('#options .tabs button').forEach((t) => t.addEventListener('click', () => {
+  document.querySelectorAll('#options .tabs button').forEach((x) => x.classList.toggle('on', x === t));
+  document.querySelectorAll('#options .tab').forEach((x) => x.classList.toggle('hidden', x.id !== 'tab-' + t.dataset.tab));
+}));
+function bindSeg(id, key, parse, onChange) {
+  const seg = $(id), sync = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', String(b.dataset.val) === String(settings[key])));
+  seg.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; settings[key] = parse(b.dataset.val); sync(); saveSettings(); onChange(); });
+  sync();
+}
+bindSeg('optTime', 'night', (v) => v === 'night', applyTime);
+bindSeg('optFps', 'fps', Number, () => {});
+bindSeg('optRes', 'res', Number, applyRes);
+bindSeg('optShader', 'shader', String, applyShader);
+function bindRange(id, key, onChange) { const el = $(id); el.value = settings[key]; el.addEventListener('input', () => { settings[key] = +el.value; saveSettings(); onChange && onChange(); }); }
+bindRange('optBtnScale', 'btnScale', applyLayout); bindRange('optSens', 'sens'); bindRange('optGloss', 'gloss', applyShader);
+function applyAllSettings() { applyTime(); applyShader(); applyRes(); applyLayout(); }
+
 /* ---------------- Start ---------------- */
 async function init() {
   buildGround(); buildCity();
@@ -941,7 +1082,7 @@ async function init() {
   models.zombie = zm;
   bodyModel = pm || buildHumanoid(PLAYER_SPEC); bodyModel.visible = false; scene.add(bodyModel); // Spielerkörper (Ego-Perspektive: ausgeblendet)
   $('loading').classList.add('hidden');
-  selectWeapon(0);
+  selectWeapon(0); applyAllSettings();
   // Menü-Hintergrund
   camera.position.set(0, 1.7, 8);
   requestAnimationFrame(frame);
