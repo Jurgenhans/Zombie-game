@@ -553,7 +553,8 @@ const PLAYER_SPEC = { skin: 0xe0ac82, top: 0x3366aa, bot: 0x222222, shoe: 0xeeee
 
 const models = { player: null, zombies: [] };
 // Gelenke des Zombie-GLB (Knoten-Indizes aus der Datei) -> Pivot-Gruppen, damit sie per Code animiert werden können
-const ZOMBIE_RIG = { head: 0, armL: 9, armR: 18, foreL: 8, foreR: 17, legL: 34, legR: 46 };
+// Knoten 9/18 = Hüfte/Beine (y≈0.95), 34/46 = Schultern/Arme (im Oberkörper-Knoten 74), 33/45 = Unterarme, 73 = Kopf
+const ZOMBIE_RIG = { head: 73, armL: 34, armR: 46, foreL: 33, foreR: 45, legL: 9, legR: 18 };
 async function rigZombie(gltf, wrap) {
   for (const [name, idx] of Object.entries(ZOMBIE_RIG)) {
     const n = await gltf.parser.getDependency('node', idx);
@@ -563,7 +564,7 @@ async function rigZombie(gltf, wrap) {
     parent.add(pv); pv.add(n);
   }
   gltf.scene.updateMatrixWorld(true);
-  const hp = gltf.scene.getObjectByName('pv_head'); if (hp) { const v = new THREE.Vector3(); hp.getWorldPosition(v); wrap.userData.headY = v.y; }
+  const hp = gltf.scene.getObjectByName('pv_head'); if (hp) { const v = new THREE.Vector3(); hp.getWorldPosition(v); wrap.userData.headY = v.y + 0.12; }
 }
 async function tryLoadModel(url, rig) {
   try {
