@@ -66,6 +66,330 @@ function canvasTex(w, h, draw, repeat) {
   return t;
 }
 
+
+/* ============================================================
+   Deckungsobjekte: Holzkisten, Fässer, Betonbarrieren
+   Nur Optik! Kollisionsboxen (addBox) bleiben exakt wie vorher.
+   Eigener Zufallsgenerator -> die Map-Zufallsfolge (seed) bleibt unverändert.
+   ============================================================ */
+function mkRng(s) { let a = s >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const hashXZ = (x, z) => Math.floor(x * 131.7 + z * 71.3) & 0x7fffffff;
+const c8 = (v) => Math.max(0, Math.min(255, v | 0));
+const shade = (rgb, k, a = 1) => `rgba(${c8(rgb[0] * k)},${c8(rgb[1] * k)},${c8(rgb[2] * k)},${a})`;
+
+// Alte Farbe -> Kisten-Stil (gleiche Farbzuordnung wie vorher: braun / grün / grau)
+const CRATE_STYLES = {
+  0x6b5a3c: { wood: [132, 98, 58], chip: null, stencil: null, straps: false },            // Holzkiste (natur)
+  0x4d5a3c: { wood: [82, 96, 58], chip: [120, 90, 56], stencil: 'AMMO', straps: false },   // Militärkiste (olivgrün lackiert)
+  0x555a60: { wood: [112, 98, 78], chip: null, stencil: null, straps: true },              // Kiste mit Stahlbändern
+};
+const crateStyle = (c) => CRATE_STYLES[c] || CRATE_STYLES[0x6b5a3c];
+
+function woodGrain(g, x, y, w, h, vertical, rgb, rng, n) {
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); g.lineCap = 'round';
+  for (let i = 0; i < n; i++) {
+    const dark = rng() < 0.7; g.strokeStyle = dark ? shade(rgb, 0.45, rr2(rng, 0.1, 0.28)) : shade(rgb, 1.4, rr2(rng, 0.06, 0.16));
+    g.lineWidth = rr2(rng, 0.6, 1.8); g.beginPath();
+    if (vertical) { const px = x + rng() * w, wob = rr2(rng, -2, 2); g.moveTo(px, y); g.bezierCurveTo(px + wob, y + h * 0.33, px - wob, y + h * 0.66, px + wob * 0.5, y + h); }
+    else { const py = y + rng() * h, wob = rr2(rng, -2, 2); g.moveTo(x, py); g.bezierCurveTo(x + w * 0.33, py + wob, x + w * 0.66, py - wob, x + w, py + wob * 0.5); }
+    g.stroke();
+  }
+  g.restore();
+}
+const rr2 = (rng, a, b) => a + (b - a) * rng();
+
+function knot(g, x, y, r, rgb) {
+  for (let i = 4; i >= 1; i--) { g.fillStyle = shade(rgb, 0.4 + i * 0.08, 0.55); g.beginPath(); g.ellipse(x, y, r * i / 2.2, r * i / 3.2, 0, 0, 7); g.fill(); }
+  g.fillStyle = shade(rgb, 0.3, 0.8); g.beginPath(); g.ellipse(x, y, r * 0.3, r * 0.2, 0, 0, 7); g.fill();
+}
+
+function nail(g, x, y, S, rust) {
+  const r = S * 0.012 + 1;
+  g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.arc(x + 0.8, y + 1, r + 0.6, 0, 7); g.fill();
+  g.fillStyle = rust ? '#6a4a34' : '#7d7f80'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.4)'; g.beginPath(); g.arc(x - r * 0.3, y - r * 0.3, r * 0.4, 0, 7); g.fill();
+}
+
+function beamEdges(g, x, y, w, h) { // Kanten-Schatten/Licht, damit Leisten plastisch wirken
+  g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  g.strokeStyle = 'rgba(255,235,200,.22)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x + 3, y + h - 3); g.lineTo(x + 3, y + 3); g.lineTo(x + w - 3, y + 3); g.stroke();
+}
+
+function drawCrateSide(g, S, st, rng) {
+  const rgb = st.wood, fx = S * 0.1, fy = S * 0.11, n = 4, ph = (S - 2 * fy) / n;
+  g.fillStyle = shade(rgb, 0.4); g.fillRect(0, 0, S, S);
+  // Bretter (waagerecht) mit Fugen, Maserung, Ästen
+  for (let i = 0; i < n; i++) {
+    const y0 = fy + i * ph, k = 0.85 + rng() * 0.3;
+    g.fillStyle = shade(rgb, k); g.fillRect(0, y0, S, ph);
+    woodGrain(g, 0, y0, S, ph, false, rgb, rng, 11);
+    if (rng() < 0.6) knot(g, fx + 8 + rng() * (S - 2 * fx - 16), y0 + ph * (0.3 + rng() * 0.4), 5 + rng() * 5, rgb);
+    g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(0, y0, S, 2.2);                     // Fuge oben
+    g.fillStyle = 'rgba(255,235,200,.12)'; g.fillRect(0, y0 + 2.2, S, 1.2);          // Lichtkante
+  }
+  // Diagonale Strebe (zwischen den Rahmenleisten)
+  g.save(); g.beginPath(); g.rect(fx, fy, S - 2 * fx, S - 2 * fy); g.clip();
+  g.translate(S / 2, S / 2); const iw = S - 2 * fx, ih = S - 2 * fy; g.rotate(rng() < 0.5 ? Math.atan2(-ih, iw) : Math.atan2(ih, iw));
+  const len = Math.hypot(iw, ih) + 8, th = S * 0.1;
+  g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(-len / 2 + 2, -th / 2 + 4, len, th);
+  g.fillStyle = shade(rgb, 1.02); g.fillRect(-len / 2, -th / 2, len, th);
+  g.save(); g.translate(0, 0); woodGrain(g, -len / 2, -th / 2, len, th, false, rgb, rng, 8); g.restore();
+  beamEdges(g, -len / 2, -th / 2, len, th);
+  g.restore();
+  // Rahmen: linke/rechte Pfosten + obere/untere Leiste
+  const beam = (x, y, w, h, vert) => {
+    g.fillStyle = shade(rgb, 0.92); g.fillRect(x, y, w, h); woodGrain(g, x, y, w, h, vert, rgb, rng, vert ? 5 : 7); beamEdges(g, x, y, w, h);
+  };
+  beam(0, 0, S, fy, false); beam(0, S - fy, S, fy, false); beam(0, fy, fx, S - 2 * fy, true); beam(S - fx, fy, fx, S - 2 * fy, true);
+  // Nägel
+  const rustN = st.chip === null;
+  for (let i = 0; i < n; i++) { const yc = fy + (i + 0.5) * ph; nail(g, fx * 0.5, yc, S, rustN); nail(g, S - fx * 0.5, yc, S, rustN); }
+  for (const x of [fx * 0.5, S * 0.3, S * 0.7, S - fx * 0.5]) { nail(g, x, fy * 0.5, S, rustN); nail(g, x, S - fy * 0.5, S, rustN); }
+  // Stahlbänder
+  if (st.straps) {
+    for (const yy of [S * 0.27, S * 0.66]) {
+      g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, yy + 3, S, S * 0.085);
+      const gr = g.createLinearGradient(0, yy, 0, yy + S * 0.085); gr.addColorStop(0, '#6b7176'); gr.addColorStop(0.5, '#454a4e'); gr.addColorStop(1, '#2f3336');
+      g.fillStyle = gr; g.fillRect(0, yy, S, S * 0.085);
+      g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(0, yy + 1, S, 1.4);
+      for (let x = S * 0.06; x < S; x += S * 0.17) { g.fillStyle = '#1d2022'; g.beginPath(); g.arc(x, yy + S * 0.0425, 3.2, 0, 7); g.fill(); g.fillStyle = '#8a9096'; g.beginPath(); g.arc(x - 0.6, yy + S * 0.0425 - 0.6, 1.6, 0, 7); g.fill(); }
+      for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(130,70,30,${rr2(rng, 0.25, 0.6)})`; g.fillRect(rng() * S, yy + rng() * S * 0.085, rr2(rng, 2, 8), rr2(rng, 1, 3)); }
+    }
+  }
+  // Abgeplatzte Farbe (lackierte Kiste)
+  if (st.chip) {
+    for (let i = 0; i < 70; i++) {
+      const nearEdge = rng() < 0.7, x = nearEdge ? (rng() < 0.5 ? rng() * fx * 1.4 : S - rng() * fx * 1.4) : rng() * S, y = nearEdge && rng() < 0.4 ? (rng() < 0.5 ? rng() * fy * 1.3 : S - rng() * fy * 1.3) : rng() * S;
+      g.fillStyle = shade(st.chip, rr2(rng, 0.55, 1), 0.9); g.beginPath(); g.moveTo(x, y);
+      for (let k = 0; k < 5; k++) g.lineTo(x + rr2(rng, -6, 6), y + rr2(rng, -4, 4)); g.fill();
+    }
+  }
+  // Schablone
+  if (st.stencil) {
+    g.save(); g.font = `bold ${(S * 0.17) | 0}px "Arial Black", Impact, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillText(st.stencil, S / 2 + 1.5, S * 0.52 + 2);
+    g.fillStyle = 'rgba(225,220,175,.82)'; g.fillText(st.stencil, S / 2, S * 0.52);
+    g.fillRect(S * 0.2, S * 0.7, S * 0.6, 3); g.restore();
+  }
+  // Schmutz & Alterung
+  const dg = g.createLinearGradient(0, S * 0.55, 0, S); dg.addColorStop(0, 'rgba(25,18,10,0)'); dg.addColorStop(1, 'rgba(25,18,10,.5)');
+  g.fillStyle = dg; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 18; i++) { g.fillStyle = `rgba(20,14,8,${rr2(rng, 0.05, 0.16)})`; g.beginPath(); g.ellipse(rng() * S, rng() * S, rr2(rng, 6, 26), rr2(rng, 4, 14), rng() * 3, 0, 7); g.fill(); }
+  for (let i = 0; i < 900; i++) { const l = rng() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${l},${l},${l},${rr2(rng, 0.03, 0.09)})`; g.fillRect(rng() * S, rng() * S, 1.6, 1.6); }
+}
+
+function drawCrateTop(g, S, st, rng) {
+  const rgb = st.wood, f = S * 0.11, n = 4, pw = (S - 2 * f) / n;
+  g.fillStyle = shade(rgb, 0.4); g.fillRect(0, 0, S, S);
+  for (let i = 0; i < n; i++) {
+    const x0 = f + i * pw; g.fillStyle = shade(rgb, 0.85 + rng() * 0.3); g.fillRect(x0, f, pw, S - 2 * f);
+    woodGrain(g, x0, f, pw, S - 2 * f, true, rgb, rng, 7);
+    g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(x0, f, 2.2, S - 2 * f);
+    for (const y of [f + 8, S - f - 8]) nail(g, x0 + pw / 2, y, S, !st.chip);
+  }
+  const beam = (x, y, w, h, vert) => { g.fillStyle = shade(rgb, 0.92); g.fillRect(x, y, w, h); woodGrain(g, x, y, w, h, vert, rgb, rng, 6); beamEdges(g, x, y, w, h); };
+  beam(0, 0, S, f, false); beam(0, S - f, S, f, false); beam(0, f, f, S - 2 * f, true); beam(S - f, f, f, S - 2 * f, true);
+  for (let i = 0; i < 12; i++) { g.fillStyle = `rgba(20,14,8,${rr2(rng, 0.06, 0.2)})`; g.beginPath(); g.ellipse(rng() * S, rng() * S, rr2(rng, 6, 24), rr2(rng, 4, 12), rng() * 3, 0, 7); g.fill(); }
+  if (st.chip) for (let i = 0; i < 30; i++) { g.fillStyle = shade(st.chip, rr2(rng, 0.6, 1), 0.85); g.fillRect(rng() * S, rng() * S, rr2(rng, 2, 7), rr2(rng, 2, 5)); }
+  for (let i = 0; i < 700; i++) { const l = rng() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${l},${l},${l},${rr2(rng, 0.03, 0.09)})`; g.fillRect(rng() * S, rng() * S, 1.6, 1.6); }
+}
+
+const _crateCache = {};
+function crateMats(color, variant = 0) {
+  const key = color + '_' + variant;
+  if (_crateCache[key]) return _crateCache[key];
+  const st = crateStyle(color), S = 256, seed0 = (color & 0xffff) * 7 + variant * 1013;
+  const mk = (t) => new THREE.MeshLambertMaterial({ map: t });
+  const side = mk(canvasTex(S, S, (g) => drawCrateSide(g, S, st, mkRng(seed0 + 1)), false));
+  const topKey = color + '_top';
+  if (!_crateCache[topKey]) _crateCache[topKey] = mk(canvasTex(S, S, (g) => drawCrateTop(g, S, st, mkRng(seed0 + 99)), false));
+  const top = _crateCache[topKey];
+  return (_crateCache[key] = [side, side, top, top, side, side]); // +x, -x, +y, -y, +z, -z
+}
+const _postCache = {};
+const cratePostMat = (color) => _postCache[color] || (_postCache[color] = lambert(new THREE.Color().setRGB(...crateStyle(color).wood.map((v) => v / 255 * 0.78)).getHex()));
+
+/* ---- Fässer ---- */
+const BARREL_STYLES = {
+  0x7a2f20: { rgb: [138, 52, 36], label: null },
+  0x3a5a3a: { rgb: [62, 102, 66], label: 'hazard' },
+  0x2f4a6a: { rgb: [48, 80, 122], label: null },
+};
+function drawBarrelSide(g, W, H, st, rng) {
+  const rgb = st.rgb;
+  g.fillStyle = shade(rgb, 1); g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 160; i++) { g.fillStyle = shade(rgb, rr2(rng, 0.8, 1.2), 0.5); g.fillRect(rng() * W, rng() * H, rr2(rng, 2, 10), rr2(rng, 1, 4)); }
+  // Rillen an den Rippen (v=1/3 und 2/3) + Rand oben/unten
+  for (const yy of [H * 0.333, H * 0.667]) { g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, yy - 6, W, 2); g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(0, yy + 5, W, 2); }
+  // Etikett (Warnzeichen)
+  if (st.label === 'hazard') {
+    const cx = W * 0.25, cy = H * 0.5, r = W * 0.1;
+    g.fillStyle = '#d9b82a'; g.strokeStyle = '#111'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy - r * 1.1); g.lineTo(cx + r * 1.1, cy + r * 0.85); g.lineTo(cx - r * 1.1, cy + r * 0.85); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#111'; g.font = `bold ${(r * 1.5) | 0}px Arial, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', cx, cy + r * 0.3);
+  } else {
+    g.fillStyle = 'rgba(235,230,210,.55)'; g.font = `bold ${(H * 0.06) | 0}px Arial, sans-serif`; g.textAlign = 'center'; g.fillText(String(10 + ((rng() * 80) | 0)), W * 0.62, H * 0.5);
+    g.fillRect(W * 0.54, H * 0.52, W * 0.16, 2);
+  }
+  // Rost-Streifen von oben und von den Rippen
+  for (let i = 0; i < 26; i++) {
+    const x = rng() * W, y0 = rng() < 0.5 ? 0 : (rng() < 0.5 ? H * 0.333 : H * 0.667), len = rr2(rng, 14, 80), w = rr2(rng, 2, 7);
+    const gr = g.createLinearGradient(0, y0, 0, y0 + len); gr.addColorStop(0, `rgba(120,58,22,${rr2(rng, 0.35, 0.6)})`); gr.addColorStop(1, 'rgba(120,58,22,0)');
+    g.fillStyle = gr; g.fillRect(x, y0, w, len);
+  }
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(${(110 + rng() * 40) | 0},${(55 + rng() * 25) | 0},22,${rr2(rng, 0.35, 0.8)})`; g.beginPath(); g.ellipse(rng() * W, H * (0.75 + rng() * 0.25), rr2(rng, 1.5, 6), rr2(rng, 1, 4), 0, 0, 7); g.fill(); } // Rost unten
+  for (let i = 0; i < 6; i++) { const x = rng() * W, y = rng() * H; g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(x, y, rr2(rng, 5, 12), rr2(rng, 4, 9), 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.ellipse(x - 2, y - 2, rr2(rng, 3, 7), rr2(rng, 2, 5), 0, 0, 7); g.fill(); } // Dellen
+  for (let i = 0; i < 14; i++) { g.strokeStyle = 'rgba(190,190,190,.4)'; g.lineWidth = 1; const x = rng() * W, y = rng() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rr2(rng, -14, 14), y + rr2(rng, -5, 5)); g.stroke(); } // Kratzer
+  const dg = g.createLinearGradient(0, H * 0.8, 0, H); dg.addColorStop(0, 'rgba(20,14,8,0)'); dg.addColorStop(1, 'rgba(20,14,8,.5)'); g.fillStyle = dg; g.fillRect(0, 0, W, H);
+}
+function drawBarrelTop(g, S, st, rng) {
+  const rgb = st.rgb, c = S / 2;
+  g.fillStyle = shade(rgb, 0.5); g.fillRect(0, 0, S, S);
+  g.fillStyle = shade(rgb, 0.85); g.beginPath(); g.arc(c, c, c * 0.97, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 3; g.beginPath(); g.arc(c, c, c * 0.84, 0, 7); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 1.5; g.beginPath(); g.arc(c, c, c * 0.8, 0, 7); g.stroke();
+  for (const [dx, dy, r] of [[-0.36, 0.05, 0.14], [0.34, -0.3, 0.09]]) { // Spundlöcher
+    const x = c + dx * c * 1.6, y = c + dy * c * 1.6, rr_ = r * S;
+    g.fillStyle = '#25282a'; g.beginPath(); g.arc(x, y, rr_ + 2, 0, 7); g.fill();
+    g.fillStyle = '#7b8084'; g.beginPath(); g.arc(x, y, rr_, 0, 7); g.fill();
+    g.strokeStyle = '#3a3e41'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, rr_ * 0.6, 0, 7); g.stroke();
+    g.fillStyle = '#4a4f53'; g.fillRect(x - rr_ * 0.5, y - 1, rr_, 2);
+  }
+  for (let i = 0; i < 30; i++) { g.fillStyle = `rgba(${(110 + rng() * 40) | 0},${(55 + rng() * 25) | 0},22,${rr2(rng, 0.3, 0.7)})`; g.beginPath(); g.arc(c + rr2(rng, -c, c) * 0.85, c + rr2(rng, -c, c) * 0.85, rr2(rng, 1, 4), 0, 7); g.fill(); }
+  g.fillStyle = 'rgba(15,12,8,.25)'; g.beginPath(); g.ellipse(c + 8, c + 10, 18, 11, 0.5, 0, 7); g.fill();
+}
+let _barrelShared = null;
+const _barrelByColor = {};
+function makeBarrel(color) {
+  if (!_barrelShared) {
+    const rim = new THREE.TorusGeometry(0.272, 0.024, 6, 16); rim.rotateX(Math.PI / 2);
+    _barrelShared = { body: new THREE.CylinderGeometry(0.29, 0.29, 0.9, 16, 1), hoop: new THREE.CylinderGeometry(0.3, 0.3, 0.05, 16, 1, true), rim };
+  }
+  if (!_barrelByColor[color]) {
+    const st = BARREL_STYLES[color] || BARREL_STYLES[0x7a2f20], seed0 = (color & 0xffff) * 3;
+    const side = new THREE.MeshLambertMaterial({ map: canvasTex(128, 256, (g, w, h) => drawBarrelSide(g, w, h, st, mkRng(seed0 + 5)), false) });
+    const top = new THREE.MeshLambertMaterial({ map: canvasTex(128, 128, (g, w) => drawBarrelTop(g, w, st, mkRng(seed0 + 9)), false) });
+    const metal = lambert(new THREE.Color().setRGB(st.rgb[0] / 255 * 0.72, st.rgb[1] / 255 * 0.72, st.rgb[2] / 255 * 0.72).getHex());
+    _barrelByColor[color] = { mats: [side, top, lambert(0x1e1c1a)], metal };
+  }
+  const S = _barrelShared, C = _barrelByColor[color], g = new THREE.Group();
+  g.add(new THREE.Mesh(S.body, C.mats));
+  for (const y of [-0.15, 0.15]) { const h = new THREE.Mesh(S.hoop, C.metal); h.position.y = y; g.add(h); }   // Rippen
+  for (const y of [-0.428, 0.428]) { const r = new THREE.Mesh(S.rim, C.metal); r.position.y = y; g.add(r); }  // Ränder oben/unten
+  return g;
+}
+
+/* ---- Betonbarrieren (Jersey-Profil) ---- */
+function drawConcrete(g, S, rng, tint) {
+  g.fillStyle = tint; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 90; i++) { const l = rng() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${l},${l},${l},${rr2(rng, 0.02, 0.06)})`; g.beginPath(); g.ellipse(rng() * S, rng() * S, rr2(rng, 10, 40), rr2(rng, 8, 30), rng() * 3, 0, 7); g.fill(); }
+  for (let i = 0; i < 2600; i++) { const l = rng() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${l},${l},${l},${rr2(rng, 0.05, 0.16)})`; g.fillRect(rng() * S, rng() * S, rr2(rng, 1, 3), rr2(rng, 1, 3)); }
+  for (let i = 0; i < 9; i++) { const x = rng() * S, y = rng() * S, r = rr2(rng, 3, 8); g.fillStyle = 'rgba(20,20,20,.5)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.fillStyle = 'rgba(210,210,200,.25)'; g.beginPath(); g.arc(x - 1, y - 1, r * 0.6, 0, 7); g.fill(); } // Lunker
+  for (let i = 0; i < 5; i++) { const x = rng() * S, y = rng() * S; g.fillStyle = 'rgba(120,60,25,.28)'; g.beginPath(); g.ellipse(x, y, rr2(rng, 3, 8), rr2(rng, 8, 26), 0, 0, 7); g.fill(); } // Rostspuren
+  g.lineCap = 'round';
+  for (let i = 0; i < 6; i++) { let x = rng() * S, y = rng() * S; g.strokeStyle = 'rgba(25,25,25,.65)'; g.lineWidth = rr2(rng, 0.8, 1.6); g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 7; k++) { x += rr2(rng, -12, 12); y += rr2(rng, -12, 12); g.lineTo(x, y); } g.stroke(); } // Risse
+  for (let i = 0; i < 4; i++) { g.fillStyle = 'rgba(15,15,15,.28)'; g.fillRect(rng() * S, rng() * S, rr2(rng, 20, 60), rr2(rng, 3, 8)); } // Schleifspuren
+}
+let _jersey = null;
+function jerseyAssets(variant) {
+  if (!_jersey) {
+    const s = new THREE.Shape(); // Querschnitt: Breite 0.6, Höhe 0.9 (wie die alte Box) – Länge 2.4
+    [[-0.3, 0], [0.3, 0], [0.3, 0.1], [0.18, 0.4], [0.1, 0.9], [-0.1, 0.9], [-0.18, 0.4], [-0.3, 0.1]].forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y)));
+    const geo = new THREE.ExtrudeGeometry(s, { depth: 2.4, bevelEnabled: false, steps: 1 });
+    geo.translate(0, -0.45, -1.2); geo.rotateY(Math.PI / 2); // Länge entlang X, Mittelpunkt wie vorher (y=0.45 per Mesh-Position)
+    _jersey = { geo, mats: [] };
+  }
+  if (!_jersey.mats[variant]) {
+    const tints = ['#8b8b86', '#7d7f7c', '#97958d'];
+    _jersey.mats[variant] = new THREE.MeshLambertMaterial({ map: canvasTex(256, 256, (g, w) => drawConcrete(g, w, mkRng(4242 + variant * 77), tints[variant % 3]), true) });
+  }
+  return { geo: _jersey.geo, mat: _jersey.mats[variant] };
+}
+
+
+/* ============================================================
+   Straßenlaternen: Lampenkopf + Nachtbeleuchtung
+   - Lichtpfützen (Boden) und Glow = je 1 Draw-Call für ALLE Laternen
+   - echte Lichter nur an den nächsten Laternen (LAMP.lightCount), das spart Leistung
+   - einige Laternen sind kaputt (aus) oder flackern (ohne rnd() -> Map bleibt gleich)
+   ============================================================ */
+const LAMP = { list: [], alive: [], ready: false, lightCount: 3, lights: [], bulbOn: null, pools: null, halos: null, haloCol: null, poolCol: null, flick: [] };
+function mergeBoxes(parts) {
+  const pos = [], nor = [], uv = [], idx = []; let off = 0;
+  for (const [sx, sy, sz, x, y, z] of parts) {
+    const b = new THREE.BoxGeometry(sx, sy, sz); b.translate(x, y, z);
+    pos.push(...b.attributes.position.array); nor.push(...b.attributes.normal.array); uv.push(...b.attributes.uv.array);
+    for (const i of b.index.array) idx.push(i + off);
+    off += b.attributes.position.count; b.dispose();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx); return geo;
+}
+let _lampA = null;
+function lampAssets() { // Koordinaten relativ zur Mitte des Mastes (Mast: y -3 … +3), Arm zeigt nach -X
+  return _lampA || (_lampA = {
+    head: mergeBoxes([[1.5, 0.07, 0.07, -0.75, 2.92, 0], [0.12, 0.2, 0.12, -0.04, 2.9, 0], [0.52, 0.1, 0.3, -1.45, 2.86, 0], [0.58, 0.035, 0.35, -1.45, 2.94, 0]]),
+    lens: new THREE.BoxGeometry(0.42, 0.02, 0.2).translate(-1.45, 2.795, 0),
+    metal: lambert(0x3a3d3f), bulbDead: new THREE.MeshBasicMaterial({ color: 0x2a2c2d }),
+  });
+}
+function addLampHead(pole, x, z, typeA) {
+  const A = lampAssets(), h = hashXZ(x, z), dead = h % 7 === 0, flick = !dead && h % 11 === 0;
+  if (!LAMP.bulbOn) LAMP.bulbOn = new THREE.MeshBasicMaterial({ color: 0xa8aaa6 });
+  const ry = typeA ? 0 : -Math.PI / 2;
+  const arm = new THREE.Mesh(A.head, A.metal); arm.rotation.y = ry; pole.add(arm);
+  const bulb = new THREE.Mesh(A.lens, dead ? A.bulbDead : LAMP.bulbOn); bulb.rotation.y = ry; pole.add(bulb);
+  LAMP.list.push({ x: typeA ? x - 1.45 : x, z: typeA ? z : z - 1.45, dead, flick, ph: (h % 100) / 10 });
+}
+function radialTex(S, stops) {
+  return canvasTex(S, S, (g, w) => { const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); stops.forEach(([o, c]) => gr.addColorStop(o, c)); g.fillStyle = gr; g.fillRect(0, 0, w, w); }, false);
+}
+function finalizeLamps() {
+  const L = LAMP.alive = LAMP.list.filter((l) => !l.dead), N = L.length;
+  if (!N) return;
+  // Lichtpfützen auf dem Boden (1 InstancedMesh)
+  const poolTex = radialTex(128, [[0, 'rgba(255,214,150,.6)'], [0.4, 'rgba(255,190,110,.28)'], [1, 'rgba(255,170,90,0)']]);
+  const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), N);
+  const d = new THREE.Object3D(), white = new THREE.Color(1, 1, 1);
+  L.forEach((l, i) => { d.position.set(l.x, 0.05, l.z); d.scale.setScalar(13); d.updateMatrix(); pools.setMatrixAt(i, d.matrix); pools.setColorAt(i, white); l.i = i; if (l.flick) LAMP.flick.push(l); });
+  pools.frustumCulled = false; pools.visible = false; scene.add(pools); LAMP.pools = pools;
+  // Glow um die Lampen (1 Points-Objekt)
+  const hp = new Float32Array(N * 3), hc = new Float32Array(N * 3).fill(1);
+  L.forEach((l, i) => hp.set([l.x, 5.78, l.z], i * 3));
+  const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.BufferAttribute(hp, 3)); hg.setAttribute('color', new THREE.BufferAttribute(hc, 3));
+  const haloTex = radialTex(64, [[0, 'rgba(255,240,200,1)'], [0.18, 'rgba(255,215,150,.65)'], [0.5, 'rgba(255,180,100,.18)'], [1, 'rgba(255,160,80,0)']]);
+  const halos = new THREE.Points(hg, new THREE.PointsMaterial({ map: haloTex, size: 2.4, sizeAttenuation: true, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  halos.frustumCulled = false; halos.visible = false; scene.add(halos); LAMP.halos = halos; LAMP.haloCol = hg.attributes.color;
+  // Echte Lichter (werden nachts zu den nächsten Laternen bewegt)
+  for (let i = 0; i < LAMP.lightCount; i++) { const pl = new THREE.PointLight(0xffc878, 0, 20, 2); pl.visible = false; scene.add(pl); LAMP.lights.push(pl); }
+  LAMP.ready = true;
+  applyLampNight(settings.night);
+}
+function applyLampNight(n) {
+  if (!LAMP.ready) return;
+  LAMP.bulbOn.color.setHex(n ? 0xffe9b8 : 0xa8aaa6);
+  LAMP.pools.visible = LAMP.halos.visible = n;
+  LAMP.lights.forEach((l) => { l.visible = n; });
+}
+const lampLevel = (l, t) => (l.flick ? (Math.sin(t * 31 + l.ph) * Math.sin(t * 5.3 + l.ph * 2.1) > 0.55 ? 0.08 : 1) : 1);
+function updateLamps(t, p) {
+  if (!LAMP.ready || !settings.night) return;
+  // Flackernde Laternen
+  if (LAMP.flick.length) {
+    const c = new THREE.Color();
+    for (const l of LAMP.flick) { const v = lampLevel(l, t); LAMP.haloCol.setXYZ(l.i, v, v, v); LAMP.pools.setColorAt(l.i, c.setRGB(v, v, v)); }
+    LAMP.haloCol.needsUpdate = true; LAMP.pools.instanceColor.needsUpdate = true;
+  }
+  // Die nächsten Laternen bekommen ein echtes Licht
+  const K = LAMP.lights.length, best = [];
+  for (const l of LAMP.alive) {
+    const d2 = (l.x - p.x) * (l.x - p.x) + (l.z - p.z) * (l.z - p.z);
+    if (best.length < K || d2 < best[best.length - 1].d2) { best.push({ l, d2 }); best.sort((a, b) => a.d2 - b.d2); if (best.length > K) best.pop(); }
+  }
+  LAMP.lights.forEach((pl, i) => { const b = best[i]; if (!b) { pl.intensity = 0; return; } pl.position.set(b.l.x, 5.6, b.l.z); pl.intensity = 55 * lampLevel(b.l, t); });
+}
+
 /* ---------------- World / Map ---------------- */
 const HALF = CONFIG.mapSize / 2;
 const boxes = []; // Kollision: {x0,x1,z0,z1,top}
@@ -268,7 +592,7 @@ function buildEnterable(cx, cz, w, d, h, tex) {
       const off = ax ? [[0, -0.75], [0, 0.75], [-1.05, 0], [1.05, 0]] : [[-0.75, 0], [0.75, 0], [0, -1.05], [0, 1.05]];
       for (let i = 0; i < 3 + (rnd() < 0.5 ? 1 : 0); i++) chair(tx + off[i][0] + rr(-0.15, 0.15), tz + off[i][1] + rr(-0.15, 0.15), rnd() < 0.3);
     } else { // Lagerraum: Kisten + Regal
-      cabinet(midx, midz, 1.0, 1.0, 1.0, lambert(0x6b5a3c)); cabinet(midx + sx * 1.3, midz - sz * 0.8, 0.8, 0.8, 0.8, lambert(0x555a40));
+      cabinet(midx, midz, 1.0, 1.0, 1.0, crateMats(0x6b5a3c, 0)); cabinet(midx + sx * 1.3, midz - sz * 0.8, 0.8, 0.8, 0.8, crateMats(0x4d5a3c, 1));
       cabinet(midx - sx * 0.6, fz - sz * 0.3, 2.2, 0.45, 1.9, M.metal);
     }
     // Papiere am Boden
@@ -301,8 +625,14 @@ function buildCity() {
       a.position.set(cx + rr(-w / 4, w / 4), h + 1, cz + rr(-d / 4, d / 4)); scene.add(a);
     }
   };
-  const crate = new THREE.BoxGeometry(1, 1, 1);
-  const addCrate = (x, z, s, c) => { const m = new THREE.Mesh(crate, lambert(c)); m.scale.set(s, s, s); m.position.set(x, s / 2, z); m.rotation.y = 0; scene.add(m); addBox(x, z, s, s, s); };
+  const crateBody = new THREE.BoxGeometry(0.96, 0.96, 0.96), cratePost = new THREE.BoxGeometry(0.1, 1, 0.1);
+  const addCrate = (x, z, s, c) => { // Optik: Holzkiste mit Brettern, Eckpfosten, Strebe, Nägeln. Kollision: unverändert (addBox)
+    const h = hashXZ(x, z), g = new THREE.Group(), pm = cratePostMat(c);
+    g.add(new THREE.Mesh(crateBody, crateMats(c, h & 1)));
+    for (const px of [-1, 1]) for (const pz of [-1, 1]) { const p = new THREE.Mesh(cratePost, pm); p.position.set(px * 0.45, 0, pz * 0.45); g.add(p); }
+    g.scale.set(s, s, s); g.position.set(x, s / 2, z); g.rotation.y = ((h >> 1) & 3) * Math.PI / 2; // 90°-Drehung: Quadrat -> Kollision identisch
+    scene.add(g); addBox(x, z, s, s, s);
+  };
 
   for (let bx = -75; bx <= 75; bx += 50) for (let bz = -75; bz <= 75; bz += 50) {
     for (let ix = 0; ix < 2; ix++) for (let iz = 0; iz < 2; iz++) {
@@ -398,29 +728,30 @@ function buildStreetProps() {
     vertical ? addBox(x, z, 1.9, 4.5, 1.5) : addBox(x, z, 4.5, 1.9, 1.5);
   }
   // Betonbarrieren & Straßenlaternen
-  const barG = new THREE.BoxGeometry(2.4, 0.9, 0.6), barM = lambert(0x8b8b86);
+  const barG = jerseyAssets(0).geo; // Jersey-Profil (Länge 2,4 · Breite 0,6 · Höhe 0,9 – wie die alte Box)
   for (let i = 0; i < 26; i++) {
     const vertical = rnd() < 0.5, road = (((rnd() * 5) | 0) - 2) * 50, along = rr(-115, 115);
     const x = vertical ? road + rr(-4, 4) : along, z = vertical ? along : road + rr(-4, 4);
     if (Math.abs(x) < 6 && Math.abs(z) < 6) continue;
-    const m = new THREE.Mesh(barG, barM); m.position.set(x, 0.45, z); scene.add(m);
+    const m = new THREE.Mesh(barG, jerseyAssets(hashXZ(x, z) % 3).mat); m.position.set(x, 0.45, z); scene.add(m);
     if (rnd() < 0.5) { m.rotation.y = Math.PI / 2; addBox(x, z, 0.6, 2.4, 0.9); } else addBox(x, z, 2.4, 0.6, 0.9);
   }
   const poleG = new THREE.CylinderGeometry(0.08, 0.1, 6, 6), poleM = lambert(0x2d2f30);
   for (let r1 = -100; r1 <= 100; r1 += 50) for (let r2 = -100; r2 <= 100; r2 += 25) {
     for (const [x, z] of [[r1 + 5.5, r2], [r2, r1 + 5.5]]) {
       if (Math.abs(x) > 120 || Math.abs(z) > 120 || Math.abs(x % 50) < 6 && Math.abs(z % 50) < 6) continue;
-      const m = new THREE.Mesh(poleG, poleM); m.position.set(x, 3, z); m.rotation.z = rnd() < 0.2 ? 0.15 : 0; scene.add(m); addBox(x, z, 0.3, 0.3, 6);
+      const m = new THREE.Mesh(poleG, poleM); m.position.set(x, 3, z); m.rotation.z = rnd() < 0.2 ? 0.15 : 0; scene.add(m); addBox(x, z, 0.3, 0.3, 6); addLampHead(m, x, z, x === r1 + 5.5);
     }
   }
   // Fässer
-  const barrelG = new THREE.CylinderGeometry(0.3, 0.3, 0.9, 8);
+  
   for (let i = 0; i < 24; i++) {
     const x = rr(-115, 115), z = rr(-115, 115);
     if (Math.abs(x) < 6 && Math.abs(z) < 6) continue;
     if (boxes.some((b) => x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5)) continue;
-    const m = new THREE.Mesh(barrelG, lambert([0x7a2f20, 0x3a5a3a, 0x2f4a6a][i % 3])); m.position.set(x, 0.45, z); scene.add(m); addBox(x, z, 0.6, 0.6, 0.9);
+    const m = makeBarrel([0x7a2f20, 0x3a5a3a, 0x2f4a6a][i % 3]); m.position.set(x, 0.45, z); m.rotation.y = (hashXZ(x, z) % 628) / 100; scene.add(m); addBox(x, z, 0.6, 0.6, 0.9);
   }
+  finalizeLamps(); // Laternen: Lichtpfützen, Glow, Lichter
 }
 
 /* Kollision & Boden */
@@ -930,6 +1261,7 @@ function frame(now) {
   if (running && !paused) update(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position); stars.rotation.y += dt * 0.003;
   updateEffects(dt);
+  updateLamps(now / 1000, camera.position);
   renderer.render(scene, camera);
 }
 function update(dt) {
@@ -1055,6 +1387,7 @@ function applyTime() {
     torch.intensity = 0;
   }
   stars.visible = n;
+  applyLampNight(n);
 }
 
 /* Shader: Glanz-Materialien + Farbfilter */
