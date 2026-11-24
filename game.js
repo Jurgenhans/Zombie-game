@@ -10,7 +10,7 @@ const CONFIG = {
   wavesEnabled: false,      // Zombie-Wellen: kommt später -> auf true setzen, um sie zu aktivieren
   trainingZombies: 6,       // Übungsziele solange keine Wellen aktiv sind (0 = keine)
   playerModelUrl: 'assets/models/player.glb',
-  zombieModelUrl: 'assets/models/zombie.glb',
+  zombieModelUrls: ['assets/models/zombie.glb'], // später: weitere Zombie-Modelle hier eintragen (zufällige Auswahl)
   walkSpeed: 3.8, sprintSpeed: 6.4, jumpSpeed: 7.4, gravity: 22,
   eyeHeight: 1.7, playerRadius: 0.4, playerMaxHp: 100,
   lookSensitivity: 0.0042,
@@ -551,14 +551,35 @@ function buildHumanoid(spec) {
 const ZOMBIE_SPEC = { skin: 0xa39588, top: 0x3d4a3a, bot: 0x2a2a30, shoe: 0x1a1a1a, hair: 0x2b2620, eyes: 0xff3322, blood: 5, sleeveLong: false };
 const PLAYER_SPEC = { skin: 0xe0ac82, top: 0x3366aa, bot: 0x222222, shoe: 0xeeeeee, hair: 0x1a1410, sleeveLong: true };
 
-const models = { player: null, zombie: null };
-async function tryLoadModel(url) {
+const models = { player: null, zombies: [] };
+// Gelenke des Zombie-GLB (Knoten-Indizes aus der Datei) -> Pivot-Gruppen, damit sie per Code animiert werden können
+const ZOMBIE_RIG = { head: 0, armL: 9, armR: 18, foreL: 8, foreR: 17, legL: 34, legR: 46 };
+async function rigZombie(gltf, wrap) {
+  for (const [name, idx] of Object.entries(ZOMBIE_RIG)) {
+    const n = await gltf.parser.getDependency('node', idx);
+    if (!n || !n.parent) continue;
+    const parent = n.parent, pv = new THREE.Group(); pv.name = 'pv_' + name;
+    pv.position.copy(n.position); n.position.set(0, 0, 0);
+    parent.add(pv); pv.add(n);
+  }
+  gltf.scene.updateMatrixWorld(true);
+  const hp = gltf.scene.getObjectByName('pv_head'); if (hp) { const v = new THREE.Vector3(); hp.getWorldPosition(v); wrap.userData.headY = v.y; }
+}
+async function tryLoadModel(url, rig) {
   try {
     const gltf = await new GLTFLoader().loadAsync(url);
-    const root = gltf.scene; const box = new THREE.Box3().setFromObject(root); const size = new THREE.Vector3(); box.getSize(size);
+    const root = gltf.scene;
+    root.traverse((o) => { // PBR -> Lambert (schneller auf Tablets, passt zu Beleuchtung & Shader-Optionen)
+      if (o.isMesh && o.material && o.material.isMeshStandardMaterial) { const m = o.material; o.material = new THREE.MeshLambertMaterial({ color: m.color, map: m.map, transparent: m.transparent, opacity: m.opacity, alphaTest: m.alphaTest, side: m.side, vertexColors: m.vertexColors }); }
+    });
+    const wrap = new THREE.Group();
+    if (rig) await rig(gltf, wrap);
+    const box = new THREE.Box3().setFromObject(root); const size = new THREE.Vector3(); box.getSize(size);
     if (!isFinite(size.y) || size.y < 0.01) return null;
-    const wrap = new THREE.Group(); const k = 1.8 / size.y; root.scale.multiplyScalar(k);
-    const b2 = new THREE.Box3().setFromObject(root); root.position.y -= b2.min.y; wrap.add(root); return wrap;
+    const k = 1.8 / size.y; root.scale.multiplyScalar(k);
+    const b2 = new THREE.Box3().setFromObject(root); root.position.y -= b2.min.y; wrap.add(root);
+    if (wrap.userData.headY !== undefined) wrap.userData.headY = wrap.userData.headY * k + root.position.y; // nach Skalierung/Verschiebung
+    return wrap;
   } catch (e) { console.warn('Modell nicht geladen (Fallback aktiv):', url, e && e.message); return null; }
 }
 
@@ -663,14 +684,18 @@ const zombies = [];
 let killsTotal = 0;
 function spawnZombie(x, z, opts = {}) {
   let root, parts = null;
-  if (models.zombie) root = models.zombie.clone(true);
-  else { root = buildHumanoid(ZOMBIE_SPEC); parts = root.parts; }
+  const src = models.zombies.length ? models.zombies[(rnd() * models.zombies.length) | 0] : null;
+  if (src) {
+    root = src.clone(true); const pv = (n) => root.getObjectByName('pv_' + n);
+    parts = { head: pv('head'), armL: pv('armL'), armR: pv('armR'), foreL: pv('foreL'), foreR: pv('foreR'), legL: pv('legL'), legR: pv('legR'), torso: { rotation: { x: 0, y: 0, z: 0 } } };
+    if (!parts.head || !parts.armL || !parts.legL) parts = null; // Rig unvollständig -> nur Ganzkörper-Animation
+  } else { root = buildHumanoid(ZOMBIE_SPEC); parts = root.parts; }
   const sc = rr(0.95, 1.08); root.scale.setScalar(sc);
   const runner = opts.runner ?? rnd() < 0.2;
   const hp = (opts.hp || 100) * (runner ? 0.7 : 1);
   const zb = {
     root, parts, pos: new THREE.Vector3(x, 0, z), yaw: rr(0, 6.28), hp, maxHp: hp, state: 'wander', t: rnd() * 5,
-    speed: (runner ? rr(3.2, 4.2) : rr(1.1, 2.0)) * (opts.speedMul || 1), dmg: opts.dmg || 12, atkCd: 0, stun: 0, headY: 1.62 * sc,
+    speed: (runner ? rr(3.2, 4.2) : rr(1.1, 2.0)) * (opts.speedMul || 1), dmg: opts.dmg || 12, atkCd: 0, stun: 0, headY: ((src && src.userData.headY) || 1.62) * sc,
     wander: new THREE.Vector3(x, 0, z), phase: rnd() * 6, stuckT: 0, lastP: new THREE.Vector3(x, 0, z), side: 0, dieT: 0, fall: rnd() < 0.5 ? -1 : 1, groanT: rr(3, 9),
     target: null, runner,
   };
@@ -735,7 +760,8 @@ function updateZombie(z, dt) {
     z.parts.legL.rotation.x = sw * amp; z.parts.legR.rotation.x = -sw * amp;
     let arm = -1.35 + Math.sin(z.phase * 0.5) * 0.1;
     if (z.atkAnim > 0) { z.atkAnim -= dt; arm = -1.35 + Math.sin(Math.min(1, z.atkAnim / 0.45) * Math.PI) * -0.9; }
-    z.parts.armL.rotation.x = arm; z.parts.armR.rotation.x = arm + 0.1; z.parts.armL.rotation.z = 0.08; z.parts.armR.rotation.z = -0.08;
+    z.parts.armL.rotation.x = arm; z.parts.armR.rotation.x = arm + 0.1;
+    if (z.parts.foreL) { z.parts.foreL.rotation.x = -0.7; z.parts.foreR.rotation.x = -0.7; } z.parts.armL.rotation.z = 0.08; z.parts.armR.rotation.z = -0.08;
     z.parts.torso.rotation.x = 0.2 + Math.abs(sw) * 0.05; z.parts.torso.rotation.z = sw * 0.06; z.parts.head.rotation.z = Math.sin(z.phase * 0.7) * 0.12;
   } else { z.root.rotation.x = 0.12; z.root.position.y += Math.abs(sw) * 0.06; z.root.rotation.z = sw * 0.05; }
 }
@@ -1078,8 +1104,8 @@ function applyAllSettings() { applyTime(); applyShader(); applyRes(); applyLayou
 async function init() {
   buildGround(); buildCity();
   $('loadText').textContent = 'Lade Modelle …';
-  const [pm, zm] = await Promise.all([tryLoadModel(CONFIG.playerModelUrl), tryLoadModel(CONFIG.zombieModelUrl)]);
-  models.zombie = zm;
+  const [pm, ...zms] = await Promise.all([tryLoadModel(CONFIG.playerModelUrl), ...CONFIG.zombieModelUrls.map((u) => tryLoadModel(u, rigZombie))]);
+  models.zombies = zms.filter(Boolean);
   bodyModel = pm || buildHumanoid(PLAYER_SPEC); bodyModel.visible = false; scene.add(bodyModel); // Spielerkörper (Ego-Perspektive: ausgeblendet)
   $('loading').classList.add('hidden');
   selectWeapon(0); applyAllSettings();
