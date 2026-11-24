@@ -963,6 +963,18 @@ function update(dt) {
   for (let i = zombies.length - 1; i >= 0; i--) if (zombies[i].gone) zombies.splice(i, 1);
   waves.update(dt); updatePickups(dt);
   $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.toSpawn : 0);
+  updateArrow();
+}
+// Richtungspfeil zum nächsten Zombie (nur bei weniger als 10 lebenden Zombies)
+function updateArrow() {
+  const el = $('zArrow'); let best = null, bd = Infinity, n = 0;
+  for (const z of zombies) { if (z.state === 'dead' || z.state === 'dying') continue; n++; const d = Math.hypot(z.pos.x - player.pos.x, z.pos.z - player.pos.z); if (d < bd) { bd = d; best = z; } }
+  if (!best || n >= 10 || player.dead) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const dx = best.pos.x - player.pos.x, dz = best.pos.z - player.pos.z, sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+  const right = dx * cy - dz * sy, fwd = -dx * sy - dz * cy; // Kamera blickt nach (-sin yaw, -cos yaw)
+  $('zArrowIcon').style.transform = `rotate(${Math.atan2(right, fwd) * 180 / Math.PI}deg)`;
+  $('zDist').textContent = Math.round(bd) + ' m';
 }
 
 /* ---------------- Optionen: Steuerung, Grafik, Shader ---------------- */
