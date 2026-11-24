@@ -944,6 +944,7 @@ function update(dt) {
     if (player.reloading) { player.reloadT -= dt; if (player.reloadT <= 0) finishReload(); }
     if (input.fireQueued) { shoot(); input.fireQueued = false; }
     else if (input.fire && w.auto) shoot();
+    else if (autoFire && aimingAtZombie(w.range)) shoot();
   } else { player.pos.y = Math.max(0, player.pos.y - dt); }
   // Kamera
   const ey = player.dead ? 0.4 : CONFIG.eyeHeight + Math.sin(player.bob * 2) * 0.035;
@@ -965,6 +966,22 @@ function update(dt) {
   $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.toSpawn : 0);
   updateArrow();
 }
+// Auto-Feuer: schießt automatisch, sobald das Fadenkreuz auf einen (nicht verdeckten) Zombie zeigt
+let autoFire = false;
+function aimingAtZombie(range) {
+  const cp = Math.cos(player.pitch), d = _d.set(-Math.sin(player.yaw) * cp, Math.sin(player.pitch), -Math.cos(player.yaw) * cp);
+  const o = new THREE.Vector3(player.pos.x, player.pos.y + CONFIG.eyeHeight, player.pos.z);
+  let tz = Infinity;
+  for (const z of zombies) {
+    if (z.state === 'dead' || z.state === 'dying') continue;
+    tz = Math.min(tz, raySphere(o, d, _o.set(z.pos.x, z.pos.y + z.headY, z.pos.z), 0.25));
+    for (const yy of [0.35, 0.8, 1.25]) tz = Math.min(tz, raySphere(o, d, _o.set(z.pos.x, z.pos.y + yy, z.pos.z), 0.38));
+  }
+  if (tz > range) return false;
+  for (const b of boxes) { const h = rayBox(o, d, b, tz); if (h && h.t < tz) return false; }
+  return true;
+}
+$('btnAuto').addEventListener('click', () => { autoFire = !autoFire; $('btnAuto').classList.toggle('on', autoFire); toast(autoFire ? 'AUTO-FEUER AN' : 'AUTO-FEUER AUS'); });
 // Richtungspfeil zum nächsten Zombie (nur bei weniger als 10 lebenden Zombies)
 function updateArrow() {
   const el = $('zArrow'); let best = null, bd = Infinity, n = 0;
