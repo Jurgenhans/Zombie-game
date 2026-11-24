@@ -9,6 +9,7 @@ on:
     paths:
       - 'index.html'
       - 'game.js'
+      - 'zombiegen.js'
       - 'style.css'
       - 'assets/**'
       - 'vendor/**'

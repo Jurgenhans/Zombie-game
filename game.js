@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { buildZombie, ZOMBIE_COUNT } from './zombiegen.js';
 
 /* ============================================================
    DEAD CITY – 3D Zombie Shooter (Three.js, Android via Capacitor)
@@ -10,6 +11,7 @@ const CONFIG = {
   wavesEnabled: false,      // Zombie-Wellen: kommt später -> auf true setzen, um sie zu aktivieren
   trainingZombies: 6,       // Übungsziele solange keine Wellen aktiv sind (0 = keine)
   playerModelUrl: 'assets/models/player.glb',
+  zombieVariants: 24,       // so viele verschiedene Generator-Zombies werden beim Start erzeugt (zufällig aus 300)
   zombieModelUrls: ['assets/models/zombie.glb'], // später: weitere Zombie-Modelle hier eintragen (zufällige Auswahl)
   walkSpeed: 3.8, sprintSpeed: 6.4, jumpSpeed: 7.4, gravity: 22,
   eyeHeight: 1.7, playerRadius: 0.4, playerMaxHp: 100,
@@ -551,7 +553,14 @@ function buildHumanoid(spec) {
 const ZOMBIE_SPEC = { skin: 0xa39588, top: 0x3d4a3a, bot: 0x2a2a30, shoe: 0x1a1a1a, hair: 0x2b2620, eyes: 0xff3322, blood: 5, sleeveLong: false };
 const PLAYER_SPEC = { skin: 0xe0ac82, top: 0x3366aa, bot: 0x222222, shoe: 0xeeeeee, hair: 0x1a1410, sleeveLong: true };
 
-const models = { player: null, zombies: [] };
+const models = { player: null, zombies: [], pool: [] };
+// Gelenk-Wrapper: Animationswerte werden zur Grundpose des Generator-Zombies addiert
+function limb(node, kind) {
+  if (!node) return null;
+  const b = node.rotation.clone(), o = { rotation: {} };
+  for (const ax of ['x', 'y', 'z']) Object.defineProperty(o.rotation, ax, { get: () => 0, set: (v) => { node.rotation[ax] = b[ax] + (kind === 'arm' && ax === 'x' ? v + 1.35 : kind === 'torso' && ax === 'x' ? v - 0.2 : v); } });
+  return o;
+}
 // Gelenke des Zombie-GLB (Knoten-Indizes aus der Datei) -> Pivot-Gruppen, damit sie per Code animiert werden können
 // Knoten 9/18 = Hüfte/Beine (y≈0.95), 34/46 = Schultern/Arme (im Oberkörper-Knoten 74), 33/45 = Unterarme, 73 = Kopf
 const ZOMBIE_RIG = { head: 73, armL: 34, armR: 46, foreL: 33, foreR: 45, legL: 9, legR: 18 };
@@ -685,13 +694,17 @@ const zombies = [];
 let killsTotal = 0;
 function spawnZombie(x, z, opts = {}) {
   let root, parts = null;
-  const src = models.zombies.length ? models.zombies[(rnd() * models.zombies.length) | 0] : null;
-  if (src) {
+  const gen = models.pool.length ? models.pool[(Math.random() * models.pool.length) | 0] : null;
+  const src = gen || (models.zombies.length ? models.zombies[(rnd() * models.zombies.length) | 0] : null);
+  if (gen) {
+    root = gen.clone(true); const nd = (n) => root.getObjectByName(n);
+    parts = { head: limb(nd('head'), 'head'), armL: limb(nd('armL'), 'arm'), armR: limb(nd('armR'), 'arm'), legL: limb(nd('legL'), 'leg'), legR: limb(nd('legR'), 'leg'), torso: limb(nd('torso'), 'torso') };
+  } else if (src) {
     root = src.clone(true); const pv = (n) => root.getObjectByName('pv_' + n);
     parts = { head: pv('head'), armL: pv('armL'), armR: pv('armR'), foreL: pv('foreL'), foreR: pv('foreR'), legL: pv('legL'), legR: pv('legR'), torso: { rotation: { x: 0, y: 0, z: 0 } } };
     if (!parts.head || !parts.armL || !parts.legL) parts = null; // Rig unvollständig -> nur Ganzkörper-Animation
   } else { root = buildHumanoid(ZOMBIE_SPEC); parts = root.parts; }
-  const sc = rr(0.95, 1.08); root.scale.setScalar(sc);
+  const sc = rr(0.95, 1.08); root.scale.multiplyScalar(sc);
   const runner = opts.runner ?? rnd() < 0.2;
   const hp = (opts.hp || 100) * (runner ? 0.7 : 1);
   const zb = {
@@ -1055,7 +1068,7 @@ const SHADERS = {
 const phongCache = new Map();
 function phongOf(m) {
   let p = phongCache.get(m);
-  if (!p) { p = new THREE.MeshPhongMaterial({ color: m.color, map: m.map, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits }); p.userData.orig = m; phongCache.set(m, p); }
+  if (!p) { p = new THREE.MeshPhongMaterial({ color: m.color, map: m.map, alphaTest: m.alphaTest, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits }); p.userData.orig = m; phongCache.set(m, p); }
   return p;
 }
 function applyShaderTo(root) {
@@ -1134,7 +1147,15 @@ function applyAllSettings() { applyTime(); applyShader(); applyRes(); applyLayou
 async function init() {
   buildGround(); buildCity();
   $('loadText').textContent = 'Lade Modelle …';
-  const [pm, ...zms] = await Promise.all([tryLoadModel(CONFIG.playerModelUrl), ...CONFIG.zombieModelUrls.map((u) => tryLoadModel(u, rigZombie))]);
+  try { // Generator-Zombies (300 mögliche Varianten, ein Teil davon wird vorab gebaut)
+    const used = new Set();
+    while (models.pool.length < CONFIG.zombieVariants) {
+      const idx = (Math.random() * ZOMBIE_COUNT) | 0; if (used.has(idx)) continue; used.add(idx);
+      models.pool.push(buildZombie(idx));
+      if (models.pool.length % 6 === 0) { $('loadText').textContent = 'Erzeuge Zombies ' + models.pool.length + '/' + CONFIG.zombieVariants; await new Promise((r) => setTimeout(r)); }
+    }
+  } catch (e) { console.warn('Zombie-Generator fehlgeschlagen, nutze Fallback:', e); models.pool = []; }
+  const [pm, ...zms] = await Promise.all([tryLoadModel(CONFIG.playerModelUrl), ...(models.pool.length ? [] : CONFIG.zombieModelUrls.map((u) => tryLoadModel(u, rigZombie)))]);
   models.zombies = zms.filter(Boolean);
   bodyModel = pm || buildHumanoid(PLAYER_SPEC); bodyModel.visible = false; scene.add(bodyModel); // Spielerkörper (Ego-Perspektive: ausgeblendet)
   $('loading').classList.add('hidden');
