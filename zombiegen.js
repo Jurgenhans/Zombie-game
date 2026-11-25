@@ -217,3 +217,13 @@ export function buildZombie(i) {
   g.userData.headY = v.y + 0.1;
   return g;
 }
+
+// Gibt Geometrien/Texturen eines nicht mehr benutzten Zombies frei (geteilte Farb-Materialien bleiben erhalten)
+export function disposeZombie(g) {
+  const shared = new Set(Object.values(MC));
+  g.traverse((o) => {
+    if (!o.isMesh) return;
+    o.geometry.dispose();
+    if (!shared.has(o.material)) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+  });
+}

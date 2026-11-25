@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { buildZombie, ZOMBIE_COUNT } from './zombiegen.js';
+import { buildZombie, disposeZombie, ZOMBIE_COUNT } from './zombiegen.js';
 
 /* ============================================================
    DEAD CITY – 3D Zombie Shooter (Three.js, Android via Capacitor)
@@ -8,10 +8,11 @@ import { buildZombie, ZOMBIE_COUNT } from './zombiegen.js';
 
 const CONFIG = {
   mapSize: 250,
-  wavesEnabled: false,      // Zombie-Wellen: kommt später -> auf true setzen, um sie zu aktivieren
+  wavesEnabled: true,       // Zombie-Wellen: Welle n = 10·n Zombies (Welle 30 = alle 300 Varianten)
+  maxWave: 30,
+  maxAlive: 22,             // gleichzeitig lebende Zombies (Leistung)
   trainingZombies: 6,       // Übungsziele solange keine Wellen aktiv sind (0 = keine)
   playerModelUrl: 'assets/models/player.glb',
-  zombieVariants: 24,       // so viele verschiedene Generator-Zombies werden beim Start erzeugt (zufällig aus 300)
   zombieModelUrls: ['assets/models/zombie.glb'], // später: weitere Zombie-Modelle hier eintragen (zufällige Auswahl)
   walkSpeed: 3.8, sprintSpeed: 6.4, jumpSpeed: 7.4, gravity: 22,
   eyeHeight: 1.7, playerRadius: 0.4, playerMaxHp: 100,
@@ -884,7 +885,17 @@ function buildHumanoid(spec) {
 const ZOMBIE_SPEC = { skin: 0xa39588, top: 0x3d4a3a, bot: 0x2a2a30, shoe: 0x1a1a1a, hair: 0x2b2620, eyes: 0xff3322, blood: 5, sleeveLong: false };
 const PLAYER_SPEC = { skin: 0xe0ac82, top: 0x3366aa, bot: 0x222222, shoe: 0xeeeeee, hair: 0x1a1410, sleeveLong: true };
 
-const models = { player: null, zombies: [], pool: [] };
+const models = { player: null, zombies: [], genOk: false };
+// Generator-Varianten mit Cache (LRU) – nicht mehr benutzte Zombies werden freigegeben, damit der Speicher nicht wächst
+const variantCache = new Map();
+function getVariant(idx) {
+  let g = variantCache.get(idx);
+  if (g) { variantCache.delete(idx); variantCache.set(idx, g); return g; }
+  g = buildZombie(idx); g.userData.refs = 0; variantCache.set(idx, g);
+  for (const [k, v] of variantCache) { if (variantCache.size <= 40) break; if (v.userData.refs === 0 && k !== idx) { disposeZombie(v); variantCache.delete(k); } }
+  return g;
+}
+const releaseZombie = (z) => { if (z.gen && !z.released) { z.gen.userData.refs--; z.released = true; } };
 // Gelenk-Wrapper: Animationswerte werden zur Grundpose des Generator-Zombies addiert
 function limb(node, kind) {
   if (!node) return null;
@@ -1025,7 +1036,7 @@ const zombies = [];
 let killsTotal = 0;
 function spawnZombie(x, z, opts = {}) {
   let root, parts = null;
-  const gen = models.pool.length ? models.pool[(Math.random() * models.pool.length) | 0] : null;
+  const gen = models.genOk ? getVariant(opts.variant !== undefined ? opts.variant : (Math.random() * ZOMBIE_COUNT) | 0) : null;
   const src = gen || (models.zombies.length ? models.zombies[(rnd() * models.zombies.length) | 0] : null);
   if (gen) {
     root = gen.clone(true); const nd = (n) => root.getObjectByName(n);
@@ -1042,8 +1053,9 @@ function spawnZombie(x, z, opts = {}) {
     root, parts, pos: new THREE.Vector3(x, 0, z), yaw: rr(0, 6.28), hp, maxHp: hp, state: 'wander', t: rnd() * 5,
     speed: (runner ? rr(3.2, 4.2) : rr(1.1, 2.0)) * (opts.speedMul || 1), dmg: opts.dmg || 12, atkCd: 0, stun: 0, headY: ((src && src.userData.headY) || 1.62) * sc,
     wander: new THREE.Vector3(x, 0, z), phase: rnd() * 6, stuckT: 0, lastP: new THREE.Vector3(x, 0, z), side: 0, dieT: 0, fall: rnd() < 0.5 ? -1 : 1, groanT: rr(3, 9),
-    target: null, runner,
+    target: null, runner, gen,
   };
+  if (gen) gen.userData.refs++;
   root.position.copy(zb.pos); scene.add(root); applyShaderTo(root); zombies.push(zb); return zb;
 }
 function damageZombie(z, dmg, head, dir, at) {
@@ -1070,7 +1082,7 @@ function updateZombie(z, dt) {
     if (k >= 1) { z.state = 'dead'; z.deadT = 0; }
     return;
   }
-  if (z.state === 'dead') { z.deadT += dt; if (z.deadT > 12) { z.root.position.y -= dt * 0.15; if (z.deadT > 18) { scene.remove(z.root); z.gone = true; } } return; }
+  if (z.state === 'dead') { z.deadT += dt; if (z.deadT > 12) { z.root.position.y -= dt * 0.15; if (z.deadT > 18) { scene.remove(z.root); releaseZombie(z); z.gone = true; } } return; }
   if (player.dead) z.state = 'wander';
   if (z.stun > 0) { z.stun -= dt; return; }
   z.atkCd -= dt; z.groanT -= dt;
@@ -1111,19 +1123,38 @@ function updateZombie(z, dt) {
   } else { z.root.rotation.x = 0.12; z.root.position.y += Math.abs(sw) * 0.06; z.root.rotation.z = sw * 0.05; }
 }
 
-/* Wellen (vollständig implementiert, aber standardmäßig AUS – CONFIG.wavesEnabled) */
+/* Wellen: Welle n hat 10·n verschiedene Zombies (Generator-Varianten 0..10n-1); Welle 30 = alle 300 */
 const waves = {
-  n: 0, toSpawn: 0, spawnT: 0, pause: 3, active: false,
-  start() { this.n++; this.toSpawn = 6 + this.n * 4; this.active = true; toast('WELLE ' + this.n); updateHUD(); },
+  n: 0, queue: [], spawnT: 0, pause: 3, active: false,
+  start() {
+    this.n++; this.active = true; this.spawnT = 1;
+    const q = []; for (let i = 0; i < this.n * 10; i++) q.push(i);
+    for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
+    this.queue = q; toast('WELLE ' + this.n + ' – ' + q.length + ' ZOMBIES'); updateHUD();
+  },
   update(dt) {
-    if (!CONFIG.wavesEnabled || player.dead) return;
+    if (!CONFIG.wavesEnabled || player.dead || won) return;
     if (!this.active) { this.pause -= dt; if (this.pause <= 0) this.start(); return; }
-    if (this.toSpawn > 0) {
+    if (this.queue.length > 0) {
       this.spawnT -= dt;
-      if (this.spawnT <= 0 && alive() < 25) { this.spawnT = Math.max(0.4, 2.2 - this.n * 0.15); this.toSpawn--; const p = randomSpawn(35, 90); spawnZombie(p.x, p.z, { hp: 100 + this.n * 12, speedMul: 1 + this.n * 0.04, dmg: 10 + this.n }); updateHUD(); }
-    } else if (alive() === 0) { this.active = false; this.pause = 8; toast('WELLE ' + this.n + ' GESCHAFFT'); }
+      if (this.spawnT <= 0 && alive() < CONFIG.maxAlive) {
+        this.spawnT = Math.max(0.5, 2.0 - this.n * 0.08); const v = this.queue.pop(), p = randomSpawn(35, 90);
+        spawnZombie(p.x, p.z, { variant: v, hp: 100 + this.n * 6, speedMul: 1 + Math.min(0.6, this.n * 0.02), dmg: 10 + Math.floor(this.n / 2) }); updateHUD();
+      }
+    } else if (alive() === 0) {
+      this.active = false; this.pause = 8;
+      if (this.n >= CONFIG.maxWave) { victory(); return; }
+      player.hp = Math.min(CONFIG.playerMaxHp, player.hp + 25); player.ammo.forEach((a, i) => (a.reserve += WEAPONS[i].mag));
+      toast('WELLE ' + this.n + ' GESCHAFFT  (+25 Leben, +Munition)'); updateHUD();
+    }
   },
 };
+let won = false;
+function victory() {
+  won = true; setPaused(true);
+  $('goTitle').textContent = 'ÜBERLEBT!'; $('goTitle').classList.remove('red'); $('goTitle').classList.add('green');
+  $('goKills').textContent = player.kills; $('goWave').textContent = waves.n; $('gameOver').classList.remove('hidden');
+}
 const alive = () => zombies.reduce((n, z) => n + (z.state === 'dead' || z.state === 'dying' ? 0 : 1), 0);
 function randomSpawn(minD, maxD) {
   for (let i = 0; i < 60; i++) {
@@ -1215,8 +1246,8 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 function updateHUD() {
   const w = WEAPONS[player.weapon], a = player.ammo[player.weapon];
   $('hpfill').style.width = Math.max(0, player.hp / CONFIG.playerMaxHp * 100) + '%'; $('hptext').textContent = Math.max(0, Math.ceil(player.hp));
-  $('wave').textContent = CONFIG.wavesEnabled ? (waves.n || 1) : '–';
-  $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.toSpawn : 0);
+  $('wave').textContent = CONFIG.wavesEnabled ? (waves.n || 1) + '/' + CONFIG.maxWave : '–';
+  $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.queue.length : 0);
   $('kills').textContent = player.kills;
   $('wname').textContent = w.name; $('mag').textContent = a.mag; $('reserve').textContent = a.reserve;
   $('ammo').classList.toggle('low', a.mag <= Math.ceil(w.mag * 0.25));
@@ -1236,10 +1267,11 @@ function hurtPlayer(d) {
 let running = false;
 const gameRunning = () => running && !player.dead && !paused;
 function resetGame() {
-  zombies.forEach((z) => scene.remove(z.root)); zombies.length = 0;
+  zombies.forEach((z) => { scene.remove(z.root); releaseZombie(z); }); zombies.length = 0;
   Object.assign(player, { hp: CONFIG.playerMaxHp, kills: 0, dead: false, vy: 0, reloading: false, fireCd: 0, yaw: 0, pitch: 0, recoilKick: 0, swapT: 0 });
   player.pos.set(0, 0, 8); player.ammo = WEAPONS.map((w) => ({ mag: w.mag, reserve: w.reserve }));
-  waves.n = 0; waves.active = false; waves.pause = 3; waves.toSpawn = 0;
+  waves.n = 0; waves.active = false; waves.pause = 3; waves.queue = []; won = false; setPaused(false);
+  $('goTitle').textContent = 'GAME OVER'; $('goTitle').classList.add('red'); $('goTitle').classList.remove('green');
   for (let i = 0; i < CONFIG.trainingZombies && !CONFIG.wavesEnabled; i++) { const p = randomSpawn(18, 60); spawnZombie(p.x, p.z); }
   spawnPickups(); selectWeapon(0); viewGuns.forEach((g, k) => (g.visible = k === 0)); updateHUD();
 }
@@ -1308,7 +1340,7 @@ function update(dt) {
   for (const z of zombies) updateZombie(z, dt);
   for (let i = zombies.length - 1; i >= 0; i--) if (zombies[i].gone) zombies.splice(i, 1);
   waves.update(dt); updatePickups(dt);
-  $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.toSpawn : 0);
+  $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.queue.length : 0);
   updateArrow();
 }
 // Auto-Feuer: schießt automatisch, sobald das Fadenkreuz auf einen (nicht verdeckten) Zombie zeigt
@@ -1480,15 +1512,8 @@ function applyAllSettings() { applyTime(); applyShader(); applyRes(); applyLayou
 async function init() {
   buildGround(); buildCity();
   $('loadText').textContent = 'Lade Modelle …';
-  try { // Generator-Zombies (300 mögliche Varianten, ein Teil davon wird vorab gebaut)
-    const used = new Set();
-    while (models.pool.length < CONFIG.zombieVariants) {
-      const idx = (Math.random() * ZOMBIE_COUNT) | 0; if (used.has(idx)) continue; used.add(idx);
-      models.pool.push(buildZombie(idx));
-      if (models.pool.length % 6 === 0) { $('loadText').textContent = 'Erzeuge Zombies ' + models.pool.length + '/' + CONFIG.zombieVariants; await new Promise((r) => setTimeout(r)); }
-    }
-  } catch (e) { console.warn('Zombie-Generator fehlgeschlagen, nutze Fallback:', e); models.pool = []; }
-  const [pm, ...zms] = await Promise.all([tryLoadModel(CONFIG.playerModelUrl), ...(models.pool.length ? [] : CONFIG.zombieModelUrls.map((u) => tryLoadModel(u, rigZombie)))]);
+  try { disposeZombie(buildZombie(0)); models.genOk = true; } catch (e) { console.warn('Zombie-Generator fehlgeschlagen, nutze Fallback:', e); models.genOk = false; }
+  const [pm, ...zms] = await Promise.all([tryLoadModel(CONFIG.playerModelUrl), ...(models.genOk ? [] : CONFIG.zombieModelUrls.map((u) => tryLoadModel(u, rigZombie)))]);
   models.zombies = zms.filter(Boolean);
   bodyModel = pm || buildHumanoid(PLAYER_SPEC); bodyModel.visible = false; scene.add(bodyModel); // Spielerkörper (Ego-Perspektive: ausgeblendet)
   $('loading').classList.add('hidden');
