@@ -2,7 +2,7 @@
 
 Ego-Shooter in Three.js, per Capacitor als Android-APK verpackt (GitHub Actions: *Projekt3D APK bauen* → Artifact `Projekt3D-APK`).
 
-- 250 × 250 m verlassene Stadt (Straßen, Häuser, Autos, Barrieren, Park), frei begehbar, Kollision, auf Autos/Kisten springen
+- Zwei Maps zur Auswahl beim Start: Kleine Map (120 × 120 m) und Große Map (250 × 250 m), verlassene Stadt (Straßen, Häuser, Autos, Barrieren, Park), frei begehbar, Kollision, auf Autos/Kisten springen
 - Touch: Joystick links (weit ziehen = Sprint), rechts wischen = Umsehen, Buttons: Feuer (ziehen = zielen), Nachladen, Sprung, Sprint, Waffenwechsel
 - 4 Waffen (Pistole, MP, Sturmgewehr, Schrotflinte) mit Schaden, Magazin/Reserve, Nachladen, Rückstoß, Mündungsfeuer, Tracer, Einschussspuren, Blut, Kopfschuss ×2,5
 - Zombies: Leben, KI (Wandern, Hören/Sehen, Verfolgen, Hindernis-Ausweichen, Nahkampf), Sterbeanimation

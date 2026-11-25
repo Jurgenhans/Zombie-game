@@ -355,16 +355,16 @@ function finalizeLamps() {
     new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), N);
   const d = new THREE.Object3D(), white = new THREE.Color(1, 1, 1);
   L.forEach((l, i) => { d.position.set(l.x, 0.05, l.z); d.scale.setScalar(13); d.updateMatrix(); pools.setMatrixAt(i, d.matrix); pools.setColorAt(i, white); l.i = i; if (l.flick) LAMP.flick.push(l); });
-  pools.frustumCulled = false; pools.visible = false; scene.add(pools); LAMP.pools = pools;
+  pools.frustumCulled = false; pools.visible = false; mapRoot.add(pools); LAMP.pools = pools;
   // Glow um die Lampen (1 Points-Objekt)
   const hp = new Float32Array(N * 3), hc = new Float32Array(N * 3).fill(1);
   L.forEach((l, i) => hp.set([l.x, 5.78, l.z], i * 3));
   const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.BufferAttribute(hp, 3)); hg.setAttribute('color', new THREE.BufferAttribute(hc, 3));
   const haloTex = radialTex(64, [[0, 'rgba(255,240,200,1)'], [0.18, 'rgba(255,215,150,.65)'], [0.5, 'rgba(255,180,100,.18)'], [1, 'rgba(255,160,80,0)']]);
   const halos = new THREE.Points(hg, new THREE.PointsMaterial({ map: haloTex, size: 2.4, sizeAttenuation: true, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-  halos.frustumCulled = false; halos.visible = false; scene.add(halos); LAMP.halos = halos; LAMP.haloCol = hg.attributes.color;
+  halos.frustumCulled = false; halos.visible = false; mapRoot.add(halos); LAMP.halos = halos; LAMP.haloCol = hg.attributes.color;
   // Echte Lichter (werden nachts zu den nächsten Laternen bewegt)
-  for (let i = 0; i < LAMP.lightCount; i++) { const pl = new THREE.PointLight(0xffc878, 0, 20, 2); pl.visible = false; scene.add(pl); LAMP.lights.push(pl); }
+  for (let i = 0; i < LAMP.lightCount; i++) { const pl = new THREE.PointLight(0xffc878, 0, 20, 2); pl.visible = false; mapRoot.add(pl); LAMP.lights.push(pl); }
   LAMP.ready = true;
   applyLampNight(settings.night);
 }
@@ -393,7 +393,21 @@ function updateLamps(t, p) {
 }
 
 /* ---------------- World / Map ---------------- */
-const HALF = CONFIG.mapSize / 2;
+const MAPS = {
+  big:   { name: 'GROSSE MAP', size: 250, blocks: [-75, -25, 25, 75], roads: [-100, -50, 0, 50, 100], edge: 120, ring: 18 },
+  small: { name: 'KLEINE MAP', size: 120, blocks: [-25, 25], roads: [-50, 0, 50], edge: 55, ring: 0 },
+};
+let MAP = MAPS.big, HALF = MAP.size / 2, mapId = null;
+const mapRoot = new THREE.Group(); scene.add(mapRoot);
+function disposeMap() {
+  mapRoot.traverse((o) => { if (o.geometry) o.geometry.dispose(); for (const m of (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [])) { if (m.map) m.map.dispose(); m.dispose(); } });
+  mapRoot.clear(); boxes.length = 0; interiorSpots.length = 0; phongCache.clear();
+  Object.assign(LAMP, { list: [], alive: [], flick: [], lights: [], ready: false, pools: null, halos: null, haloCol: null });
+}
+function loadMap(id) {
+  disposeMap(); MAP = MAPS[id]; HALF = MAP.size / 2; mapId = id; seed = 1337;
+  buildGround(); buildCity(); applyShaderTo(mapRoot); applyLampNight(settings.night);
+}
 const boxes = []; // Kollision: {x0,x1,z0,z1,top}
 function addBox(cx, cz, w, d, top) { boxes.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, top }); }
 
@@ -401,14 +415,14 @@ function buildGround() {
   const SIZE = Math.min(3072, renderer.capabilities.maxTextureSize || 2048);
   const aniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4;
   const tex = canvasTex(SIZE, SIZE, (g, w, h) => {
-    const px = w / CONFIG.mapSize;                 // Pixel pro Meter
+    const px = w / MAP.size;                 // Pixel pro Meter
     const X = (m) => (m + HALF) * px;
     const R = (x, z, ww, hh) => g.fillRect(X(x), X(z), ww * px, hh * px);
     // --- Asphalt mit Flecken
     g.fillStyle = '#3e4144'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 2600; i++) { const l = rnd() < .5 ? 0 : 255; g.fillStyle = `rgba(${l},${l},${l},${rr(.02, .07)})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, rr(.3, 2.6) * px, 0, 7); g.fill(); }
     // --- Blöcke: Gehsteig-Ring + Betonplatten
-    for (let bx = -75; bx <= 75; bx += 50) for (let bz = -75; bz <= 75; bz += 50) {
+    for (const bx of MAP.blocks) for (const bz of MAP.blocks) {
       g.fillStyle = '#85847d'; R(bx - 20, bz - 20, 40, 40);
       for (let a = 0; a < 40; a += 0.6) for (let b = 0; b < 2; b += 0.6) { // Pflaster im Ring (alle 4 Seiten)
         const t = 118 + rnd() * 26; g.fillStyle = `rgb(${t},${t - 1},${t - 6})`;
@@ -422,11 +436,11 @@ function buildGround() {
     }
     // --- Gras am Rand
     g.fillStyle = '#48512f';
-    g.fillRect(0, 0, w, X(-120)); g.fillRect(0, X(120), w, h); g.fillRect(0, 0, X(-120), h); g.fillRect(X(120), 0, w, h);
-    for (let i = 0; i < 26000; i++) { const x = rnd() * w, y = rnd() * h; if (x > X(-120) && x < X(120) && y > X(-120) && y < X(120)) continue; g.strokeStyle = `rgba(${(40 + rnd() * 50) | 0},${(60 + rnd() * 60) | 0},${(20 + rnd() * 20) | 0},.8)`; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rr(-3, 3), y - rr(2, 7)); g.stroke(); }
+    g.fillRect(0, 0, w, X(-MAP.edge)); g.fillRect(0, X(MAP.edge), w, h); g.fillRect(0, 0, X(-MAP.edge), h); g.fillRect(X(MAP.edge), 0, w, h);
+    for (let i = 0; i < 26000; i++) { const x = rnd() * w, y = rnd() * h; if (x > X(-MAP.edge) && x < X(MAP.edge) && y > X(-MAP.edge) && y < X(MAP.edge)) continue; g.strokeStyle = `rgba(${(40 + rnd() * 50) | 0},${(60 + rnd() * 60) | 0},${(20 + rnd() * 20) | 0},.8)`; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rr(-3, 3), y - rr(2, 7)); g.stroke(); }
     // --- Straßenmarkierungen
-    const inter = [-100, -50, 0, 50, 100];
-    const segs = []; let a0 = -120; for (const c of inter) { segs.push([a0, c - 5]); a0 = c + 5; } segs.push([a0, 120]);
+    const inter = MAP.roads;
+    const segs = []; let a0 = -MAP.edge; for (const c of inter) { segs.push([a0, c - 5]); a0 = c + 5; } segs.push([a0, MAP.edge]);
     for (const r of inter) for (const vert of [true, false]) {
       const rect = (a, b, la, lb) => (vert ? R(r + a, b, la, lb) : R(b, r + a, lb, la)); // a: quer zur Straße, b: längs
       for (const [s0, s1] of segs) {
@@ -442,7 +456,7 @@ function buildGround() {
     // --- Details: Flecken, Risse, Gullys, Müll
     g.setLineDash([]);
     const onRoad = (x, z) => inter.some((r) => Math.abs(x - r) < 4.5 || Math.abs(z - r) < 4.5);
-    const rp = () => { for (let k = 0; k < 40; k++) { const x = rr(-118, 118), z = rr(-118, 118); if (onRoad(x, z)) return [x, z]; } return [0, 20]; };
+    const rp = () => { for (let k = 0; k < 40; k++) { const x = rr(-MAP.edge + 2, MAP.edge - 2), z = rr(-MAP.edge + 2, MAP.edge - 2); if (onRoad(x, z)) return [x, z]; } return [0, 20]; };
     for (let i = 0; i < 260; i++) { const [x, z] = rp(); g.fillStyle = `rgba(8,8,8,${rr(.15, .4)})`; g.beginPath(); g.ellipse(X(x), X(z), rr(.3, 1.2) * px, rr(.2, .8) * px, rnd() * 3, 0, 7); g.fill(); } // Ölflecken
     for (let i = 0; i < 40; i++) { const [x, z] = rp(); g.fillStyle = 'rgba(60,70,85,.35)'; g.beginPath(); g.ellipse(X(x), X(z), rr(.6, 1.6) * px, rr(.4, 1) * px, rnd() * 3, 0, 7); g.fill(); } // Pfützen
     for (let i = 0; i < 18; i++) { const [x, z] = rp(); g.fillStyle = 'rgba(5,5,5,.8)'; g.beginPath(); g.ellipse(X(x), X(z), rr(.25, .5) * px, rr(.2, .4) * px, 0, 0, 7); g.fill(); g.strokeStyle = 'rgba(120,120,120,.5)'; g.lineWidth = 1; g.stroke(); } // Schlaglöcher
@@ -462,19 +476,19 @@ function buildGround() {
     g.putImageData(id, 0, 0);
   }, false);
   tex.anisotropy = aniso;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.mapSize, CONFIG.mapSize), new THREE.MeshLambertMaterial({ map: tex }));
-  m.rotation.x = -Math.PI / 2; scene.add(m);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(MAP.size, MAP.size), new THREE.MeshLambertMaterial({ map: tex }));
+  m.rotation.x = -Math.PI / 2; mapRoot.add(m);
   // Detail-Textur (gekachelt) für Schärfe im Nahbereich
   const det = canvasTex(256, 256, (g, w, h) => {
     g.clearRect(0, 0, w, h);
     for (let i = 0; i < 5200; i++) { const l = rnd() < .5 ? 0 : 255; g.fillStyle = `rgba(${l},${l},${l},${rr(.08, .35)})`; g.fillRect(rnd() * w, rnd() * h, rr(1, 2.5), rr(1, 2.5)); }
     for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(0,0,0,${rr(.15, .3)})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, rr(1.5, 3.5), 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.arc(rnd() * w - 1, rnd() * h - 1, rr(.8, 1.8), 0, 7); g.fill(); }
   }, true);
-  det.repeat.set(CONFIG.mapSize / 1.6, CONFIG.mapSize / 1.6); det.anisotropy = aniso;
-  const ov = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.mapSize, CONFIG.mapSize), new THREE.MeshLambertMaterial({ map: det, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
-  ov.rotation.x = -Math.PI / 2; ov.position.y = 0.004; scene.add(ov);
+  det.repeat.set(MAP.size / 1.6, MAP.size / 1.6); det.anisotropy = aniso;
+  const ov = new THREE.Mesh(new THREE.PlaneGeometry(MAP.size, MAP.size), new THREE.MeshLambertMaterial({ map: det, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  ov.rotation.x = -Math.PI / 2; ov.position.y = 0.004; mapRoot.add(ov);
   const outer = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), lambert(0x3d4430));
-  outer.rotation.x = -Math.PI / 2; outer.position.y = -0.05; scene.add(outer);
+  outer.rotation.x = -Math.PI / 2; outer.position.y = -0.05; mapRoot.add(outer);
 }
 
 function facadeTexture(base, lit) {
@@ -524,7 +538,7 @@ function buildEnterable(cx, cz, w, d, h, tex) {
   const solid = (x0, x1, z0, z1, y0, y1, mat, collide = true) => {
     if (x1 - x0 < 0.001 || z1 - z0 < 0.001) return;
     const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat === 'facade' ? segMat(Math.max(x1 - x0, z1 - z0), y1 - y0) : mat);
-    m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); scene.add(m);
+    m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); mapRoot.add(m);
     if (collide) boxes.push({ x0, x1, z0, z1, top: y1, y0 });
   };
   // Wand entlang X (fester z-Bereich) bzw. Z mit optionaler Türöffnung (gc = Mitte, gw = Breite)
@@ -545,15 +559,15 @@ function buildEnterable(cx, cz, w, d, h, tex) {
   // Obergeschosse (massiv) + Decke
   const hu = h - H, t1 = tex.clone(), t2 = tex.clone(); t1.repeat.set(w / 4, hu / 4); t2.repeat.set(d / 4, hu / 4); t1.needsUpdate = t2.needsUpdate = true;
   const mA = new THREE.MeshLambertMaterial({ map: t1 }), mB = new THREE.MeshLambertMaterial({ map: t2 });
-  const up = new THREE.Mesh(new THREE.BoxGeometry(w, hu, d), [mB, mB, roofMat, M.ceil, mA, mA]); up.position.set(cx, H + hu / 2, cz); scene.add(up);
+  const up = new THREE.Mesh(new THREE.BoxGeometry(w, hu, d), [mB, mB, roofMat, M.ceil, mA, mA]); up.position.set(cx, H + hu / 2, cz); mapRoot.add(up);
   boxes.push({ x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, top: h, y0: H });
-  const fl = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * T, 0.04, d - 2 * T), M.floor); fl.position.set(cx, 0.02, cz); scene.add(fl);
+  const fl = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * T, 0.04, d - 2 * T), M.floor); fl.position.set(cx, 0.02, cz); mapRoot.add(fl);
   M.floor.map.repeat.set(5, 5);
   // Innenräume: Kreuzflur, vier Räume
   const ihw = hw - T, ihd = hd - T;
   const mat = M.plaster;
   const furn = (sx, sy, sz, m, x, y, z, collide, topH, y0 = 0) => { // Möbelteil
-    const b = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m); b.position.set(x, y, z); scene.add(b);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m); b.position.set(x, y, z); mapRoot.add(b);
     if (collide) boxes.push({ x0: x - sx / 2, x1: x + sx / 2, z0: z - sz / 2, z1: z + sz / 2, top: topH, y0 });
   };
   const table = (x, z, alongX) => {
@@ -605,7 +619,7 @@ function buildEnterable(cx, cz, w, d, h, tex) {
   if (rnd() < 0.6) cabinet(cx + RD - 0.3, cz + hd - T - 0.4, 0.5, 0.6, 1.0, lambert(0x6b5a3c));
   interiorSpots.push({ x: cx, z: cz });
   if (rnd() < 0.5) interiorSpots.push({ x: cx + (rnd() < 0.5 ? -1 : 1) * 3.2, z: cz + 0.0 });
-  if (rnd() < 0.5) { const a = new THREE.Mesh(new THREE.BoxGeometry(w * .3, 2, d * .3), roofMat); a.position.set(cx + rr(-w / 4, w / 4), h + 1, cz + rr(-d / 4, d / 4)); scene.add(a); }
+  if (rnd() < 0.5) { const a = new THREE.Mesh(new THREE.BoxGeometry(w * .3, 2, d * .3), roofMat); a.position.set(cx + rr(-w / 4, w / 4), h + 1, cz + rr(-d / 4, d / 4)); mapRoot.add(a); }
 }
 
 function buildCity() {
@@ -620,11 +634,11 @@ function buildCity() {
     tex.repeat.set(w / 4, h / 4); side.repeat.set(d / 4, h / 4);
     const mats = [side, side, null, null, tex, tex].map((t) => (t ? new THREE.MeshLambertMaterial({ map: t }) : roofMat));
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
-    m.position.set(cx, h / 2, cz); scene.add(m);
+    m.position.set(cx, h / 2, cz); mapRoot.add(m);
     addBox(cx, cz, w, d, h);
     if (rnd() < 0.5) { // Dachaufbau
       const a = new THREE.Mesh(new THREE.BoxGeometry(w * .3, 2, d * .3), roofMat);
-      a.position.set(cx + rr(-w / 4, w / 4), h + 1, cz + rr(-d / 4, d / 4)); scene.add(a);
+      a.position.set(cx + rr(-w / 4, w / 4), h + 1, cz + rr(-d / 4, d / 4)); mapRoot.add(a);
     }
   };
   const crateBody = new THREE.BoxGeometry(0.96, 0.96, 0.96), cratePost = new THREE.BoxGeometry(0.1, 1, 0.1);
@@ -633,10 +647,10 @@ function buildCity() {
     g.add(new THREE.Mesh(crateBody, crateMats(c, h & 1)));
     for (const px of [-1, 1]) for (const pz of [-1, 1]) { const p = new THREE.Mesh(cratePost, pm); p.position.set(px * 0.45, 0, pz * 0.45); g.add(p); }
     g.scale.set(s, s, s); g.position.set(x, s / 2, z); g.rotation.y = ((h >> 1) & 3) * Math.PI / 2; // 90°-Drehung: Quadrat -> Kollision identisch
-    scene.add(g); addBox(x, z, s, s, s);
+    mapRoot.add(g); addBox(x, z, s, s, s);
   };
 
-  for (let bx = -75; bx <= 75; bx += 50) for (let bz = -75; bz <= 75; bz += 50) {
+  for (const bx of MAP.blocks) for (const bz of MAP.blocks) {
     for (let ix = 0; ix < 2; ix++) for (let iz = 0; iz < 2; iz++) {
       const cx = bx + (ix ? 10 : -10), cz = bz + (iz ? 10 : -10);
       if (Math.abs(cx) < 15 && Math.abs(cz) < 15) { // Park in der Mitte
@@ -651,16 +665,16 @@ function buildCity() {
     }
   }
   // Außenrand: ein paar Ruinen & Bäume
-  for (let i = 0; i < 18; i++) {
-    const side = i % 4, t = rr(-110, 110), o = rr(110, 120);
+  for (let i = 0; i < MAP.ring; i++) {
+    const side = i % 4, t = rr(-(MAP.edge - 10), MAP.edge - 10), o = rr(MAP.edge - 10, MAP.edge);
     const x = side === 0 ? t : side === 1 ? t : side === 2 ? -o : o;
     const z = side === 0 ? -o : side === 1 ? o : t;
     if (i % 3 === 0) addBuilding(x, z, rr(8, 12), rr(8, 12), rr(5, 10)); else addTree(x, z);
   }
   // Begrenzungsmauer (unsichtbar + sichtbare Absperrung)
   const wallMat = lambert(0x55585a);
-  [[0, -HALF - 1, CONFIG.mapSize + 4, 2], [0, HALF + 1, CONFIG.mapSize + 4, 2], [-HALF - 1, 0, 2, CONFIG.mapSize + 4], [HALF + 1, 0, 2, CONFIG.mapSize + 4]].forEach(([x, z, w, d]) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 5, d), wallMat); m.position.set(x, 2.5, z); scene.add(m); addBox(x, z, w, d, 50);
+  [[0, -HALF - 1, MAP.size + 4, 2], [0, HALF + 1, MAP.size + 4, 2], [-HALF - 1, 0, 2, MAP.size + 4], [HALF + 1, 0, 2, MAP.size + 4]].forEach(([x, z, w, d]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 5, d), wallMat); m.position.set(x, 2.5, z); mapRoot.add(m); addBox(x, z, w, d, 50);
   });
   buildStreetProps();
 }
@@ -672,7 +686,7 @@ function addTree(x, z) {
     const b = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.07, 1.8, 4), lambert(0x3a2e24));
     b.position.set(0.5 * Math.cos(i * 1.6), 3.2 + i * 0.2, 0.5 * Math.sin(i * 1.6)); b.rotation.set(Math.sin(i * 1.6) * .9, 0, -Math.cos(i * 1.6) * .9); g.add(b);
   }
-  g.position.set(x, 0, z); scene.add(g); addBox(x, z, 0.5, 0.5, 5);
+  g.position.set(x, 0, z); mapRoot.add(g); addBox(x, z, 0.5, 0.5, 5);
 }
 
 function buildStreetProps() {
@@ -718,40 +732,42 @@ function buildStreetProps() {
     if (flat >= 0) g.rotation.z = (flat < 2 ? 1 : -1) * 0.025 * (flat % 2 ? 1 : -1);
     return g;
   };
-  for (let i = 0; i < 46; i++) {
-    const vertical = rnd() < 0.5, road = (((rnd() * 5) | 0) - 2) * 50;
-    const along = rr(-115, 115);
+  const AF = (MAP.size / 250) ** 2;
+  for (let i = 0; i < Math.max(8, Math.round(46 * AF)); i++) {
+    const vertical = rnd() < 0.5, road = MAP.roads[(rnd() * MAP.roads.length) | 0];
+    const along = rr(-(MAP.edge - 5), MAP.edge - 5);
     let x = vertical ? road + rr(-3.6, 3.6) : along, z = vertical ? along : road + rr(-3.6, 3.6);
     if (Math.abs(x) < 6 && Math.abs(z) < 6) continue; // Spawn freihalten
     const g = makeCar();
     g.position.set(x, 0, z);
     g.rotation.y = (vertical ? Math.PI / 2 : 0) + (rnd() < 0.5 ? Math.PI : 0) + rr(-0.06, 0.06);
-    scene.add(g);
+    mapRoot.add(g);
     vertical ? addBox(x, z, 1.9, 4.5, 1.5) : addBox(x, z, 4.5, 1.9, 1.5);
   }
   // Betonbarrieren & Straßenlaternen
   const barG = jerseyAssets(0).geo; // Jersey-Profil (Länge 2,4 · Breite 0,6 · Höhe 0,9 – wie die alte Box)
-  for (let i = 0; i < 26; i++) {
-    const vertical = rnd() < 0.5, road = (((rnd() * 5) | 0) - 2) * 50, along = rr(-115, 115);
+  for (let i = 0; i < Math.max(4, Math.round(26 * AF)); i++) {
+    const vertical = rnd() < 0.5, road = MAP.roads[(rnd() * MAP.roads.length) | 0], along = rr(-(MAP.edge - 5), MAP.edge - 5);
     const x = vertical ? road + rr(-4, 4) : along, z = vertical ? along : road + rr(-4, 4);
     if (Math.abs(x) < 6 && Math.abs(z) < 6) continue;
-    const m = new THREE.Mesh(barG, jerseyAssets(hashXZ(x, z) % 3).mat); m.position.set(x, 0.45, z); scene.add(m);
+    const m = new THREE.Mesh(barG, jerseyAssets(hashXZ(x, z) % 3).mat); m.position.set(x, 0.45, z); mapRoot.add(m);
     if (rnd() < 0.5) { m.rotation.y = Math.PI / 2; addBox(x, z, 0.6, 2.4, 0.9); } else addBox(x, z, 2.4, 0.6, 0.9);
   }
   const poleG = new THREE.CylinderGeometry(0.08, 0.1, 6, 6), poleM = lambert(0x2d2f30);
-  for (let r1 = -100; r1 <= 100; r1 += 50) for (let r2 = -100; r2 <= 100; r2 += 25) {
+  const RM = MAP.roads[MAP.roads.length - 1];
+  for (const r1 of MAP.roads) for (let r2 = -RM; r2 <= RM; r2 += 25) {
     for (const [x, z] of [[r1 + 5.5, r2], [r2, r1 + 5.5]]) {
-      if (Math.abs(x) > 120 || Math.abs(z) > 120 || Math.abs(x % 50) < 6 && Math.abs(z % 50) < 6) continue;
-      const m = new THREE.Mesh(poleG, poleM); m.position.set(x, 3, z); m.rotation.z = rnd() < 0.2 ? 0.15 : 0; scene.add(m); addBox(x, z, 0.3, 0.3, 6); addLampHead(m, x, z, x === r1 + 5.5);
+      if (Math.abs(x) > MAP.edge || Math.abs(z) > MAP.edge || Math.abs(x % 50) < 6 && Math.abs(z % 50) < 6) continue;
+      const m = new THREE.Mesh(poleG, poleM); m.position.set(x, 3, z); m.rotation.z = rnd() < 0.2 ? 0.15 : 0; mapRoot.add(m); addBox(x, z, 0.3, 0.3, 6); addLampHead(m, x, z, x === r1 + 5.5);
     }
   }
   // Fässer
   
-  for (let i = 0; i < 24; i++) {
-    const x = rr(-115, 115), z = rr(-115, 115);
+  for (let i = 0; i < Math.max(4, Math.round(24 * AF)); i++) {
+    const x = rr(-(MAP.edge - 5), MAP.edge - 5), z = rr(-(MAP.edge - 5), MAP.edge - 5);
     if (Math.abs(x) < 6 && Math.abs(z) < 6) continue;
     if (boxes.some((b) => x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5)) continue;
-    const m = makeBarrel([0x7a2f20, 0x3a5a3a, 0x2f4a6a][i % 3]); m.position.set(x, 0.45, z); m.rotation.y = (hashXZ(x, z) % 628) / 100; scene.add(m); addBox(x, z, 0.6, 0.6, 0.9);
+    const m = makeBarrel([0x7a2f20, 0x3a5a3a, 0x2f4a6a][i % 3]); m.position.set(x, 0.45, z); m.rotation.y = (hashXZ(x, z) % 628) / 100; mapRoot.add(m); addBox(x, z, 0.6, 0.6, 0.9);
   }
   finalizeLamps(); // Laternen: Lichtpfützen, Glow, Lichter
 }
@@ -1139,7 +1155,7 @@ const waves = {
     if (this.queue.length > 0) {
       this.spawnT -= dt;
       if (this.spawnT <= 0 && alive() < CONFIG.maxAlive) {
-        this.spawnT = CONFIG.spawnInterval; const v = this.queue.pop(), p = randomSpawn(35, 90);
+        this.spawnT = CONFIG.spawnInterval; const v = this.queue.pop(), p = randomSpawn(HALF * 0.28, HALF * 0.72);
         spawnZombie(p.x, p.z, { variant: v, hp: 100 + this.n * 6, speedMul: 1 + Math.min(0.6, this.n * 0.02), dmg: 10 + Math.floor(this.n / 2) }); updateHUD();
       }
     } else if (alive() === 0) {
@@ -1170,9 +1186,9 @@ const pickups = [];
 function spawnPickups() {
   pickups.forEach((p) => scene.remove(p.m)); pickups.length = 0;
   const ammoM = lambert(0xc9a227), medM = lambert(0xdddddd), red = lambert(0xcc2222);
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < Math.max(6, Math.round(16 * (MAP.size / 250) ** 2)); i++) {
     const sp = i < 6 && interiorSpots.length ? interiorSpots[(i * 7 + (rnd() * 3 | 0)) % interiorSpots.length] : null;
-    const p = sp ? { x: sp.x + rr(-0.6, 0.6), z: sp.z + rr(-0.6, 0.6) } : randomSpawn(8, 110); const ammo = i % 3 !== 0;
+    const p = sp ? { x: sp.x + rr(-0.6, 0.6), z: sp.z + rr(-0.6, 0.6) } : randomSpawn(8, Math.min(110, HALF - 10)); const ammo = i % 3 !== 0;
     const m = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.28, 0.28), ammo ? ammoM : medM); m.add(b);
     if (!ammo) { const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.3), red), c2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.3), red); m.add(c1, c2); }
     m.position.set(p.x, 0.6, p.z); scene.add(m); applyShaderTo(m); pickups.push({ m, ammo, t: 0, x: p.x, z: p.z });
@@ -1276,13 +1292,17 @@ function resetGame() {
   for (let i = 0; i < CONFIG.trainingZombies && !CONFIG.wavesEnabled; i++) { const p = randomSpawn(18, 60); spawnZombie(p.x, p.z); }
   spawnPickups(); selectWeapon(0); viewGuns.forEach((g, k) => (g.visible = k === 0)); updateHUD();
 }
-function startGame() {
-  initAudio(); $('startScreen').classList.add('hidden'); $('gameOver').classList.add('hidden'); $('hud').classList.remove('hidden');
+async function startGame(id) {
+  id = id || mapId || 'big'; initAudio();
+  if (id !== mapId) { $('loadText').textContent = 'Lade ' + MAPS[id].name + ' …'; $('loading').classList.remove('hidden'); await new Promise((r) => setTimeout(r, 40)); loadMap(id); $('loading').classList.add('hidden'); }
+  $('startScreen').classList.add('hidden'); $('gameOver').classList.add('hidden'); $('hud').classList.remove('hidden');
   resetGame(); running = true;
   try { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el); if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* ignorieren */ }
 }
-$('btnStart').addEventListener('click', startGame);
-$('btnRestart').addEventListener('click', startGame);
+$('btnStartSmall').addEventListener('click', () => startGame('small'));
+$('btnStartBig').addEventListener('click', () => startGame('big'));
+$('btnRestart').addEventListener('click', () => startGame(mapId));
+$('btnMenu').addEventListener('click', () => { running = false; setPaused(false); $('gameOver').classList.add('hidden'); $('hud').classList.add('hidden'); $('startScreen').classList.remove('hidden'); });
 
 let last = performance.now(), lastRender = 0;
 function frame(now) {
@@ -1511,7 +1531,6 @@ function applyAllSettings() { applyTime(); applyShader(); applyRes(); applyLayou
 
 /* ---------------- Start ---------------- */
 async function init() {
-  buildGround(); buildCity();
   $('loadText').textContent = 'Lade Modelle …';
   try { disposeZombie(buildZombie(0)); models.genOk = true; } catch (e) { console.warn('Zombie-Generator fehlgeschlagen, nutze Fallback:', e); models.genOk = false; }
   const [pm, ...zms] = await Promise.all([tryLoadModel(CONFIG.playerModelUrl), ...(models.genOk ? [] : CONFIG.zombieModelUrls.map((u) => tryLoadModel(u, rigZombie)))]);
