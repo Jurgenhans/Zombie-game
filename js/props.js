@@ -266,7 +266,7 @@ export function addTree(x, z) {
     const b = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.07, 1.8, 4), lambert(0x3a2e24));
     b.position.set(0.5 * Math.cos(i * 1.6), 3.2 + i * 0.2, 0.5 * Math.sin(i * 1.6)); b.rotation.set(Math.sin(i * 1.6) * .9, 0, -Math.cos(i * 1.6) * .9); g.add(b);
   }
-  g.add(makeCanopy(x, z));
+  g.add(makeCanopy(x, z)); g.add(makeLeafCluster(x, z));
   const pile = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), leafPileMat()); pile.rotation.x = -Math.PI / 2; pile.rotation.z = (hashXZ(x, z) % 628) / 100; pile.position.y = 0.035; g.add(pile); // Laub am Boden
   g.position.set(x, 0, z); mapRoot.add(g); addBox(x, z, 0.5, 0.5, 5);
 }
@@ -284,6 +284,52 @@ export function leafPileMat() {
     }
   }, false) });
   return _leafPileMat;
+}
+/* ---- Laub-Generator: EIN einzelnes Blatt (Textur + gebogene Geometrie) wird per InstancedMesh hunderte Male
+        pro Baum verteilt (1 Draw-Call pro Baum, alle Blaetter teilen Geometrie und Material) ---- */
+export const LEAF = { count: 340, w: 0.26, h: 0.32 };
+let _leafGeo = null, _leafTexMat = null;
+export function leafTexture() { // Blatt mit Spitze, Mittelrippe, Seitenadern und Zacken (hell/grau, wird per Instanzfarbe eingefaerbt)
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    const cx = w / 2, top = 6, bot = h - 8;
+    g.beginPath(); g.moveTo(cx, top);
+    for (let t = 0; t <= 1.001; t += 0.05) { // rechte Seite mit leichten Zacken
+      const y = top + (bot - top) * t, wd = Math.sin(Math.pow(t, 0.75) * Math.PI) * w * 0.4, z = 1 + (Math.sin(t * 38) * 0.05);
+      g.lineTo(cx + wd * z, y);
+    }
+    for (let t = 1; t >= -0.001; t -= 0.05) { const y = top + (bot - top) * t, wd = Math.sin(Math.pow(Math.max(t, 0), 0.75) * Math.PI) * w * 0.4, z = 1 + (Math.sin(t * 41 + 1) * 0.05); g.lineTo(cx - wd * z, y); }
+    g.closePath();
+    const gr = g.createLinearGradient(0, top, 0, bot); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#bdbdbd'); g.fillStyle = gr; g.fill();
+    g.save(); g.clip();
+    g.strokeStyle = 'rgba(70,50,30,.55)'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(cx, top); g.lineTo(cx, bot + 6); g.stroke();      // Mittelrippe
+    g.lineWidth = 1.2; g.strokeStyle = 'rgba(70,50,30,.38)';
+    for (let t = 0.12; t < 0.95; t += 0.11) { const y = top + (bot - top) * t; for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(cx, y + 6); g.lineTo(cx + sx * w * 0.36, y - 14); g.stroke(); } } // Seitenadern
+    for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(0,0,0,${0.03 + (i % 5) * 0.012})`; g.fillRect((i * 47) % w, (i * 29) % h, 3 + i % 4, 3 + i % 3); }        // Flecken
+    g.restore();
+  }, false);
+}
+export function leafAssets() {
+  if (!_leafGeo) {
+    _leafGeo = new THREE.PlaneGeometry(LEAF.w, LEAF.h, 1, 2); const p = _leafGeo.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setZ(i, p.getY(i) === 0 ? 0.035 : 0); // in der Mitte gewoelbt (Falz entlang der Rippe)
+    _leafGeo.computeVertexNormals();
+    _leafTexMat = new THREE.MeshLambertMaterial({ map: leafTexture(), alphaTest: 0.5, side: THREE.DoubleSide });
+  }
+  return [_leafGeo, _leafTexMat];
+}
+export function makeLeafCluster(x, z) {
+  const r = mkRng(hashXZ(x, z) + 313), [geo, mat] = leafAssets(), im = new THREE.InstancedMesh(geo, mat, LEAF.count);
+  const d = new THREE.Object3D(), c = new THREE.Color(), tone = LEAF_COLORS[(r() * LEAF_COLORS.length) | 0];
+  for (let i = 0; i < LEAF.count; i++) {
+    // Punkt auf/nahe der Oberflaeche eines Ellipsoids (Krone), unten etwas haengend
+    const th = r() * 6.283, ph = Math.acos(2 * r() - 1), k = 0.75 + r() * 0.4;
+    d.position.set(Math.sin(ph) * Math.cos(th) * 2.0 * k, 5.15 + Math.cos(ph) * 1.35 * k, Math.sin(ph) * Math.sin(th) * 2.0 * k);
+    d.rotation.set((r() - 0.5) * 2.6, r() * 6.283, (r() - 0.5) * 2.6); d.scale.setScalar(0.8 + r() * 0.9);
+    d.updateMatrix(); im.setMatrixAt(i, d.matrix);
+    c.setHex(r() < 0.55 ? tone : LEAF_COLORS[(r() * LEAF_COLORS.length) | 0]).multiplyScalar(0.85 + r() * 0.45); im.setColorAt(i, c);
+  }
+  return im;
 }
 export function makeCanopy(x, z) {
   const r = mkRng(hashXZ(x, z) + 91), pos = [], col = [];
