@@ -1179,18 +1179,23 @@ function raySphere(o, d, c, r) {
 
 /* ---------------- Audio (synthetisiert) ---------------- */
 let actx = null;
-function initAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; } }
+let master = null;
+const audioOff = () => !actx || !settings.sound;
+function applyVolume() { if (master) master.gain.value = settings.sound ? Math.pow(settings.volume / 100, 2) : 0; }
+function initAudio() {
+  try { if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); master = actx.createGain(); master.connect(actx.destination); applyVolume(); } if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; }
+}
 let _nb = null;
 function noiseStart(src, t0, dur) { // gemeinsamer Rauschpuffer, zufälliger Startpunkt (spart Speicher)
   if (!_nb) { _nb = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate); const d = _nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
   src.buffer = _nb; src.start(t0, Math.random() * 0.8, dur + 0.05);
 }
 function outNode(pan) { // Stereo-Position (-1 links … +1 rechts)
-  if (!pan || !actx.createStereoPanner) return actx.destination;
-  const p = actx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); p.connect(actx.destination); return p;
+  if (!pan || !actx.createStereoPanner) return master;
+  const p = actx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); p.connect(master); return p;
 }
 function sfxNoise(dur, freq, vol, type = 'lowpass', q = 0.7, pan = 0, delay = 0, attack = 0) {
-  if (!actx) return; const t0 = actx.currentTime + delay, s = actx.createBufferSource();
+  if (audioOff()) return; const t0 = actx.currentTime + delay, s = actx.createBufferSource();
   const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
   const g = actx.createGain();
   if (attack > 0) { g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + attack); } else g.gain.setValueAtTime(vol, t0);
@@ -1198,7 +1203,7 @@ function sfxNoise(dur, freq, vol, type = 'lowpass', q = 0.7, pan = 0, delay = 0,
   s.connect(f); f.connect(g); g.connect(outNode(pan)); noiseStart(s, t0, dur);
 }
 function sfxTone(freq, dur, vol, type = 'sine', slide = 0, pan = 0, delay = 0) {
-  if (!actx) return; const t0 = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  if (audioOff()) return; const t0 = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
   o.type = type; o.frequency.setValueAtTime(freq, t0);
   if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), t0 + dur);
   g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
@@ -1206,7 +1211,7 @@ function sfxTone(freq, dur, vol, type = 'sine', slide = 0, pan = 0, delay = 0) {
 }
 // Metallisch/hölzern klingender Anschlag: mehrere kurze, abklingende Obertöne
 function sfxPing(freqs, dur, vol, pan = 0, delay = 0) {
-  if (!actx) return; const t0 = actx.currentTime + delay, out = outNode(pan);
+  if (audioOff()) return; const t0 = actx.currentTime + delay, out = outNode(pan);
   freqs.forEach((f, i) => {
     const o = actx.createOscillator(), g = actx.createGain(), d = dur * (1 - i * 0.12);
     o.type = 'sine'; o.frequency.value = f * (1 + (Math.random() - 0.5) * 0.03);
@@ -1217,7 +1222,7 @@ function sfxPing(freqs, dur, vol, pan = 0, delay = 0) {
 // Stimme (Zombie-Stöhnen): Sägezahn mit Vibrato, starker Verzerrung, Knarz-Amplitudenmodulation, Formantfiltern, kratzigem Atem – kurz & trocken (kein Nachhall)
 const _curves = {};
 function sfxVoice({ f0 = 80, glide = -20, dur = 1.0, vol = 0.2, pan = 0, form = [[500, 7], [1100, 8], [2400, 9]], rasp = 18, breath = 0.45, vib = 6, delay = 0, attack = 0.06, growl = 0.6 } = {}) {
-  if (!actx || vol < 0.004) return; const t0 = actx.currentTime + delay, t1 = t0 + dur, out = outNode(pan);
+  if (audioOff() || vol < 0.004) return; const t0 = actx.currentTime + delay, t1 = t0 + dur, out = outNode(pan);
   const osc = actx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(f0, t0); osc.frequency.linearRampToValueAtTime(Math.max(30, f0 + glide), t1);
   const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = vib + Math.random() * 2; lg.gain.value = f0 * 0.06; lfo.connect(lg); lg.connect(osc.frequency);
   const sh = actx.createWaveShaper();
@@ -1856,7 +1861,7 @@ function updateArrow() {
 
 /* ---------------- Optionen: Steuerung, Grafik, Shader ---------------- */
 const SETTINGS_KEY = 'deadcity_settings_v1';
-const settings = { night: false, fps: 60, res: 1, shader: 'off', gloss: 100, sens: 100, btnScale: 100, layout: {} };
+const settings = { sound: true, volume: 80, night: false, fps: 60, res: 1, shader: 'off', gloss: 100, sens: 100, btnScale: 100, layout: {} };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { /* ignorieren */ }
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignorieren */ } };
 let paused = false, editMode = false;
@@ -1984,13 +1989,15 @@ function bindSeg(id, key, parse, onChange) {
   seg.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; settings[key] = parse(b.dataset.val); sync(); saveSettings(); onChange(); });
   sync();
 }
-bindSeg('optTime', 'night', (v) => v === 'night', applyTime);
+bindSeg('optTime', 'night', (v) => v === 'true', applyTime);
+bindSeg('optSound', 'sound', (v) => v === 'true', () => { initAudio(); applyVolume(); if (settings.sound) SFX.rClack(); });
 bindSeg('optFps', 'fps', Number, () => {});
 bindSeg('optRes', 'res', Number, applyRes);
 bindSeg('optShader', 'shader', String, applyShader);
 function bindRange(id, key, onChange) { const el = $(id); el.value = settings[key]; el.addEventListener('input', () => { settings[key] = +el.value; saveSettings(); onChange && onChange(); }); }
-bindRange('optBtnScale', 'btnScale', applyLayout); bindRange('optSens', 'sens'); bindRange('optGloss', 'gloss', applyShader);
-function applyAllSettings() { applyTime(); applyShader(); applyRes(); applyLayout(); }
+$('optVolume').addEventListener('change', () => { initAudio(); applyVolume(); SFX.rClack(); }); // Hörprobe beim Loslassen
+bindRange('optVolume', 'volume', applyVolume); bindRange('optBtnScale', 'btnScale', applyLayout); bindRange('optSens', 'sens'); bindRange('optGloss', 'gloss', applyShader);
+function applyAllSettings() { applyTime(); applyShader(); applyRes(); applyLayout(); applyVolume(); }
 
 /* ---------------- Start ---------------- */
 async function init() {

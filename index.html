@@ -67,7 +67,7 @@
 
 <div id="options" class="screen hidden">
   <div class="panel">
-    <div class="tabs"><button data-tab="ctl" class="on">STEUERUNG</button><button data-tab="gfx">GRAFIK</button><button data-tab="shd">SHADER</button></div>
+    <div class="tabs"><button data-tab="ctl" class="on">STEUERUNG</button><button data-tab="gfx">GRAFIK</button><button data-tab="shd">SHADER</button><button data-tab="snd">TON</button></div>
     <div class="tab" id="tab-ctl">
       <div class="row"><button id="btnEditLayout" class="opt">TASTEN POSITIONIEREN</button><button id="btnResetLayout" class="opt">LAYOUT ZURÜCKSETZEN</button></div>
       <label>Tastengröße <input type="range" id="optBtnScale" min="70" max="140" step="5"></label>
@@ -76,7 +76,7 @@
     </div>
     <div class="tab hidden" id="tab-gfx">
       <div class="lab">TAGESZEIT</div>
-      <div class="seg" id="optTime"><button data-val="day">☀ TAG</button><button data-val="night">☾ NACHT (Sterne, Taschenlampe)</button></div>
+      <div class="seg" id="optTime"><button data-val="false">☀ TAG</button><button data-val="true">☾ NACHT (Sterne, Taschenlampe)</button></div>
       <div class="lab">MAX. FPS</div>
       <div class="seg" id="optFps"><button data-val="30">30</button><button data-val="60">60</button><button data-val="90">90</button><button data-val="120">120</button></div>
       <div class="lab">AUFLÖSUNG</div>
@@ -87,6 +87,12 @@
       <div class="seg" id="optShader"><button data-val="off">AUS</button><button data-val="gloss">GLANZ</button><button data-val="wet">NASS</button><button data-val="cinema">KINO</button><button data-val="horror">HORROR</button></div>
       <label>Glanz-Stärke <input type="range" id="optGloss" min="0" max="250" step="10"></label>
       <p class="hint">Glanz/Nass/Kino lassen Oberflächen spiegeln und glänzen, Kino und Horror ändern zusätzlich die Farbstimmung.</p>
+    </div>
+    <div class="tab hidden" id="tab-snd">
+      <div class="lab">TON</div>
+      <div class="seg" id="optSound"><button data-val="true">🔊 AN</button><button data-val="false">🔇 AUS</button></div>
+      <label>Lautstärke <input type="range" id="optVolume" min="0" max="100" step="5"></label>
+      <p class="hint">Gilt für alle Geräusche (Schüsse, Nachladen, Zombies, Schritte). Beim Loslassen des Reglers hörst du eine Probe.</p>
     </div>
     <button id="btnCloseOptions" class="big">ZURÜCK ZUM SPIEL</button>
   </div>
