@@ -1026,7 +1026,8 @@ function buildCity() {
 }
 
 /* ---- Müll: Pappbecher, Dosen, Flaschen, Tüten, Papier, Pappe, Fast-Food-Boxen – nur Optik, KEINE Kollision (man läuft einfach drüber) ---- */
-function scatterTrash() {
+function scatterTrash() { buildTrash({ mapRoot, MAP, HALF, boxes, interiorSpots, mkRng, groundH }); }
+function scatterTrashOld() {
   const r = mkRng(4711 + MAP.size), AF = (MAP.size / 250) ** 2, T = {};
   const bag = new THREE.IcosahedronGeometry(1, 1); { const p = bag.attributes.position, jr = mkRng(5), seen = new Map(); for (let i = 0; i < p.count; i++) { const k = p.getX(i).toFixed(2) + p.getY(i).toFixed(2) + p.getZ(i).toFixed(2); if (!seen.has(k)) seen.set(k, [0.75 + jr() * 0.5, jr() - 0.5]); const j = seen.get(k); p.setXYZ(i, p.getX(i) * j[0], p.getY(i) * (0.7 + j[1] * 0.8), p.getZ(i) * j[0]); } bag.computeVertexNormals(); }
   const defs = {

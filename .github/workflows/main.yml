@@ -10,6 +10,7 @@ on:
       - 'index.html'
       - 'game.js'
       - 'zombiegen.js'
+      - 'trash.js'
       - 'style.css'
       - 'assets/**'
       - 'vendor/**'
