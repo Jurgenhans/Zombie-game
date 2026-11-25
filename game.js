@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildZombie, disposeZombie, ZOMBIE_COUNT } from './zombiegen.js';
-
+import { scatterTrash as buildTrash } from './trash.js';
 /* ============================================================
    DEAD CITY – 3D Zombie Shooter (Three.js, Android via Capacitor)
    ============================================================ */
