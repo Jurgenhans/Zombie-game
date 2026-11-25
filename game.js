@@ -801,7 +801,7 @@ function facadeTexture(base, lit, variant = 0) {
   if (FACADE.cache[key]) return FACADE.cache[key];
   const r = mkRng(hashXZ(base.length * 977 + base.charCodeAt(1) * 31 + base.charCodeAt(3) * 7 + base.charCodeAt(5), lit.charCodeAt(1) * 13 + variant * 101));
   const rg = (a, b) => a + (b - a) * r();
-  const PX = 64, W = TILE_W * PX, H = Math.round(TILE_H * PX);
+  const PX = 88, W = TILE_W * PX, H = Math.round(TILE_H * PX);
   const style = ((parseInt(base.slice(1, 3), 16) + variant) % 3);          // 0 Backstein, 1 Putz, 2 Betonplatten
   const [br, bg, bb] = [parseInt(base.slice(1, 3), 16), parseInt(base.slice(3, 5), 16), parseInt(base.slice(5, 7), 16)];
   const litIdx = (r() * 8) | 0;
