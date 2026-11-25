@@ -860,42 +860,93 @@ function raySphere(o, d, c, r) {
 /* ---------------- Audio (synthetisiert) ---------------- */
 let actx = null;
 function initAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; } }
-function noiseBuf(dur) { const b = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
+let _nb = null;
+function noiseStart(src, t0, dur) { // gemeinsamer Rauschpuffer, zufälliger Startpunkt (spart Speicher)
+  if (!_nb) { _nb = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate); const d = _nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  src.buffer = _nb; src.start(t0, Math.random() * 0.8, dur + 0.05);
+}
 function outNode(pan) { // Stereo-Position (-1 links … +1 rechts)
   if (!pan || !actx.createStereoPanner) return actx.destination;
   const p = actx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); p.connect(actx.destination); return p;
 }
-function sfxNoise(dur, freq, vol, type = 'lowpass', q = 0.7, pan = 0) {
-  if (!actx) return; const s = actx.createBufferSource(); s.buffer = noiseBuf(dur);
+function sfxNoise(dur, freq, vol, type = 'lowpass', q = 0.7, pan = 0, delay = 0, attack = 0) {
+  if (!actx) return; const t0 = actx.currentTime + delay, s = actx.createBufferSource();
   const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
-  const g = actx.createGain(); g.gain.setValueAtTime(vol, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-  s.connect(f); f.connect(g); g.connect(outNode(pan)); s.start();
+  const g = actx.createGain();
+  if (attack > 0) { g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + attack); } else g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  s.connect(f); f.connect(g); g.connect(outNode(pan)); noiseStart(s, t0, dur);
 }
-function sfxTone(freq, dur, vol, type = 'sine', slide = 0, pan = 0) {
-  if (!actx) return; const o = actx.createOscillator(), g = actx.createGain();
-  o.type = type; o.frequency.setValueAtTime(freq, actx.currentTime);
-  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), actx.currentTime + dur);
-  g.gain.setValueAtTime(vol, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-  o.connect(g); g.connect(outNode(pan)); o.start(); o.stop(actx.currentTime + dur);
+function sfxTone(freq, dur, vol, type = 'sine', slide = 0, pan = 0, delay = 0) {
+  if (!actx) return; const t0 = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(outNode(pan)); o.start(t0); o.stop(t0 + dur);
 }
+// Metallisch/hölzern klingender Anschlag: mehrere kurze, abklingende Obertöne
+function sfxPing(freqs, dur, vol, pan = 0, delay = 0) {
+  if (!actx) return; const t0 = actx.currentTime + delay, out = outNode(pan);
+  freqs.forEach((f, i) => {
+    const o = actx.createOscillator(), g = actx.createGain(), d = dur * (1 - i * 0.12);
+    o.type = 'sine'; o.frequency.value = f * (1 + (Math.random() - 0.5) * 0.03);
+    g.gain.setValueAtTime(vol / (1 + i * 0.7), t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + d);
+    o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + d + 0.02);
+  });
+}
+// Stimme (Zombie-Stöhnen): Sägezahn-Quelle mit Vibrato, Verzerrung (Rauheit) und Formantfiltern + Atemrauschen
+const _curves = {};
+function sfxVoice({ f0 = 80, glide = -20, dur = 1.2, vol = 0.2, pan = 0, form = [[500, 7], [1100, 8], [2400, 9]], rasp = 8, breath = 0.25, vib = 5, delay = 0, attack = 0.12 } = {}) {
+  if (!actx || vol < 0.004) return; const t0 = actx.currentTime + delay, t1 = t0 + dur, out = outNode(pan);
+  const osc = actx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(f0, t0); osc.frequency.linearRampToValueAtTime(Math.max(30, f0 + glide), t1);
+  const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = vib + Math.random() * 2; lg.gain.value = f0 * 0.05; lfo.connect(lg); lg.connect(osc.frequency);
+  const sh = actx.createWaveShaper();
+  if (!_curves[rasp]) { const c = new Float32Array(257); for (let i = 0; i < 257; i++) c[i] = Math.tanh(rasp * (i / 128 - 1)); _curves[rasp] = c; }
+  sh.curve = _curves[rasp]; osc.connect(sh);
+  const env = actx.createGain(); env.gain.setValueAtTime(0.0001, t0); env.gain.linearRampToValueAtTime(vol, t0 + attack); env.gain.exponentialRampToValueAtTime(0.001, t1);
+  const mix = actx.createGain(); mix.gain.value = 1;
+  for (const [fr, q] of form) {
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(fr, t0); bp.frequency.linearRampToValueAtTime(fr * 0.85, t1);
+    const fg = actx.createGain(); fg.gain.value = 3.5; sh.connect(bp); bp.connect(fg); fg.connect(mix);
+  }
+  mix.connect(env); env.connect(out);
+  if (breath > 0) { // Atem
+    const n = actx.createBufferSource(), bf = actx.createBiquadFilter(), bg = actx.createGain();
+    bf.type = 'bandpass'; bf.frequency.value = 1500; bf.Q.value = 0.7; bg.gain.setValueAtTime(0.0001, t0); bg.gain.linearRampToValueAtTime(breath * vol, t0 + attack); bg.gain.exponentialRampToValueAtTime(0.001, t1);
+    n.connect(bf); bf.connect(bg); bg.connect(out); noiseStart(n, t0, dur);
+  }
+  osc.start(t0); lfo.start(t0); osc.stop(t1 + 0.05); lfo.stop(t1 + 0.05);
+}
+const VOWELS = [[[700, 8], [1200, 9], [2600, 10]], [[350, 7], [800, 8], [2400, 10]], [[450, 7], [900, 8], [2500, 10]], [[500, 8], [1700, 9], [2500, 10]]];
 const SFX = {
   shot(k) { const big = k === 3 ? 1 : k === 2 ? 0.8 : 0.6; sfxNoise(0.25 + big * 0.15, k === 3 ? 1400 : 3000, 0.9 * big, 'lowpass'); sfxTone(k === 3 ? 90 : 140, 0.18, 0.6 * big, 'sine', -80); },
-  empty() { sfxTone(900, 0.05, 0.25, 'square'); },
-  // Nachlade-Bausteine (synthetisch)
-  rClick() { sfxNoise(0.025, 4200, 0.4, 'bandpass', 4); sfxTone(1800, 0.02, 0.12, 'square'); },           // Magazin-Haltung / Sicherung
-  rClack() { sfxNoise(0.06, 2400, 0.55, 'bandpass', 2); sfxTone(420, 0.06, 0.3, 'square', -200); },     // Metall auf Metall
-  rThunk() { sfxTone(150, 0.1, 0.55, 'sine', -70); sfxNoise(0.07, 700, 0.45, 'lowpass'); },            // Magazin einsetzen
-  rOut()   { sfxNoise(0.1, 1600, 0.3, 'bandpass', 1.5); sfxTone(260, 0.07, 0.15, 'triangle', -90); },  // Magazin herausziehen
-  rScrape() { sfxNoise(0.2, 3200, 0.3, 'bandpass', 1.2); },                                           // Schlitten/Verschluss zurück
-  rShell() { sfxTone(240, 0.05, 0.3, 'triangle', -80); sfxNoise(0.045, 1500, 0.35, 'bandpass', 3); }, // Patrone in Schrotflinte
-  rRustle() { sfxNoise(0.12, 1500, 0.15, 'lowpass'); },
-  hit() { sfxNoise(0.1, 600, 0.5); },
-  zhurt() { sfxTone(160, 0.25, 0.25, 'sawtooth', -60); },
-  groan(vol, pan) { sfxTone(rr(70, 110), 0.7, 0.2 * vol, 'sawtooth', -25, pan); },
-  step(vol, pan, run) { sfxNoise(run ? 0.07 : 0.1, run ? 380 : 240, 0.55 * vol, 'lowpass', 0.8, pan); sfxTone(run ? 95 : 70, 0.08, 0.35 * vol, 'sine', -30, pan); },
-  pain() { sfxNoise(0.18, 400, 0.7); sfxTone(110, 0.2, 0.4, 'sine', -50); },
-  pickup() { sfxTone(660, 0.1, 0.25, 'triangle'); setTimeout(() => sfxTone(990, 0.12, 0.25, 'triangle'), 90); },
-  death() { sfxTone(200, 0.9, 0.4, 'sawtooth', -150); },
+  empty() { sfxPing([2600, 4100], 0.03, 0.25); sfxNoise(0.015, 3500, 0.2, 'highpass'); },
+  // Nachlade-Bausteine (synthetisch, ohne Piepstöne: Rauschen + kurze Metall-/Holz-Anschläge)
+  rClick() { sfxPing([3200, 5100], 0.03, 0.25); sfxNoise(0.015, 3000, 0.25, 'highpass'); },                      // Magazin-Haltung / Sicherung
+  rClack() { sfxPing([1800, 2900, 4300], 0.07, 0.35); sfxNoise(0.03, 2500, 0.4, 'bandpass', 2); },              // Metall auf Metall
+  rThunk() { sfxNoise(0.08, 500, 0.5, 'lowpass'); sfxPing([110], 0.12, 0.5); },                                 // Magazin einsetzen
+  rOut()   { sfxNoise(0.12, 1200, 0.25, 'bandpass', 1, 0, 0, 0.02); sfxPing([2200], 0.03, 0.15); },             // Magazin herausziehen
+  rScrape() { sfxNoise(0.22, 2800, 0.22, 'bandpass', 0.8, 0, 0, 0.04); },                                       // Schlitten/Verschluss zurück
+  rShell() { sfxPing([1400, 2100], 0.05, 0.2); sfxNoise(0.04, 1800, 0.3, 'bandpass', 3); sfxPing([140], 0.1, 0.25, 0, 0.03); }, // Patrone in Schrotflinte
+  rRustle() { sfxNoise(0.15, 2000, 0.12, 'bandpass', 0.5, 0, 0, 0.05); },
+  // Treffer & Zombie-Geräusche
+  hit(vol = 1, pan = 0) { sfxNoise(0.09, 450, 0.65 * vol, 'lowpass', 0.7, pan); sfxNoise(0.05, 1100, 0.3 * vol, 'bandpass', 1.2, pan, 0.01); sfxPing([95], 0.1, 0.4 * vol, pan); },
+  zhurt(vol = 1, pan = 0) { sfxVoice({ f0: 130, glide: -40, dur: 0.35, vol: 0.3 * vol, pan, form: VOWELS[0], attack: 0.03, rasp: 12, breath: 0.3, vib: 7 }); },
+  groan(vol, pan) { sfxVoice({ f0: rr(60, 95), glide: rr(-28, -6), dur: rr(0.9, 1.7), vol: 0.3 * vol, pan, form: VOWELS[(Math.random() * VOWELS.length) | 0], rasp: rr(6, 12), breath: 0.3 }); },
+  step(vol, pan, run) {
+    sfxNoise(run ? 0.06 : 0.09, run ? 520 : 380, 0.7 * vol, 'lowpass', 0.8, pan);                              // Ferse
+    sfxPing([run ? 85 : 62], 0.1, 0.55 * vol, pan);                                                            // Körper-Dump
+    sfxNoise(0.1, 2600, 0.18 * vol, 'highpass', 0.7, pan, run ? 0.025 : 0.045, 0.01);                          // Schleifen/Kiesel
+  },
+  death(vol = 1, pan = 0) {
+    sfxVoice({ f0: 110, glide: -55, dur: 1.5, vol: 0.38 * vol, pan, form: VOWELS[0], rasp: 10, breath: 0.35, attack: 0.08 });
+    sfxNoise(0.2, 260, 0.6 * vol, 'lowpass', 0.7, pan, 0.7); sfxPing([55], 0.25, 0.5 * vol, pan, 0.7);        // Aufprall
+  },
+  pain() { sfxNoise(0.12, 500, 0.8); sfxPing([70], 0.18, 0.6); sfxNoise(0.35, 1200, 0.22, 'bandpass', 0.8, 0, 0.08, 0.06); },
+  pickup(ammo) {
+    if (ammo) { sfxPing([1800, 2800, 4200], 0.07, 0.3); sfxPing([1500, 2400, 3600], 0.08, 0.28, 0, 0.06); sfxNoise(0.05, 900, 0.2, 'lowpass', 0.7, 0, 0.02); }
+    else { sfxNoise(0.06, 3200, 0.18, 'highpass'); sfxPing([1300, 1950], 0.09, 0.22, 0, 0.05); sfxPing([1700, 2550], 0.12, 0.22, 0, 0.12); }
+  },
 };
 
 /* ---------------- Effekte ---------------- */
@@ -1139,14 +1190,14 @@ function spawnZombie(x, z, opts = {}) {
   root.position.copy(zb.pos); scene.add(root); applyShaderTo(root); zombies.push(zb); return zb;
 }
 function damageZombie(z, dmg, head, dir, at) {
-  z.hp -= dmg; z.stun = 0.2; SFX.hit();
+  z.hp -= dmg; z.stun = 0.2; const za = zAudio(z); SFX.hit(za.vol, za.pan);
   if (z.state === 'wander') { z.state = 'chase'; }
   emit(at, head ? 14 : 7, 'blood', head ? 3.5 : 2.5, 0.05, 9, dir);
   if (z.hp <= 0) { killZombie(z, head); return true; }
-  SFX.zhurt(); return false;
+  SFX.zhurt(za.vol, za.pan); return false;
 }
 function killZombie(z, head) {
-  z.state = 'dying'; z.dieT = 0; player.kills++; killsTotal++; SFX.death();
+  z.state = 'dying'; z.dieT = 0; player.kills++; killsTotal++; { const za = zAudio(z); SFX.death(za.vol, za.pan); }
   emit(new THREE.Vector3(z.pos.x, z.pos.y + 1, z.pos.z), head ? 25 : 14, 'blood', 3, 0.06, 9);
   updateHUD();
 }
@@ -1165,6 +1216,10 @@ function audioOf(z, dist) {
   const dx = z.pos.x - player.pos.x, dz = z.pos.z - player.pos.z, d = Math.max(0.5, dist);
   const f = Math.max(0, 1 - d / CONFIG.soundRange);
   return { vol: f * f, pan: (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / d * Math.min(1, 4 / d + 0.5) };
+}
+function zAudio(z) { // Lautstärke/Richtung für Treffer- und Sterbegeräusche
+  const d = Math.hypot(z.pos.x - player.pos.x, z.pos.z - player.pos.z);
+  return { vol: clamp(1 - d / 80, 0.2, 1), pan: audioOf(z, d).pan };
 }
 function updateZombie(z, dt) {
   const pp = player.pos; const dx = pp.x - z.pos.x, dz = pp.z - z.pos.z; const dist = Math.hypot(dx, dz);
@@ -1280,7 +1335,7 @@ function updatePickups(dt) {
     if (Math.hypot(p.x - player.pos.x, p.z - player.pos.z) < 1.5) {
       if (p.ammo) { player.ammo.forEach((a, i) => (a.reserve += Math.ceil(WEAPONS[i].mag * 1.5))); toast('MUNITION'); }
       else if (player.hp < CONFIG.playerMaxHp) { player.hp = Math.min(CONFIG.playerMaxHp, player.hp + 35); toast('+35 LEBEN'); } else continue;
-      p.m.visible = false; p.t = 60; SFX.pickup(); updateHUD();
+      p.m.visible = false; p.t = 60; SFX.pickup(p.ammo); updateHUD();
     }
   }
 }
