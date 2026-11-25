@@ -10,6 +10,8 @@ const CONFIG = {
   mapSize: 250,
   wavesEnabled: true,       // Zombie-Wellen: Welle n = 10·n Zombies (Welle 30 = alle 300 Varianten)
   maxWave: 30,
+  soundVoices: 5,           // nur die nächsten N Zombies machen Schritt-/Stöhn-Geräusche
+  soundRange: 40,           // Hörweite in Metern
   maxAlive: 9999,           // gleichzeitig lebende Zombies (bei Leistungsproblemen z.B. auf 40 setzen)
   spawnInterval: 0.12,      // Sekunden zwischen Spawns (verteilt das Erzeugen der Zombies)
   trainingZombies: 6,       // Übungsziele solange keine Wellen aktiv sind (0 = keine)
@@ -822,18 +824,22 @@ function raySphere(o, d, c, r) {
 let actx = null;
 function initAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; } }
 function noiseBuf(dur) { const b = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
-function sfxNoise(dur, freq, vol, type = 'lowpass', q = 0.7) {
+function outNode(pan) { // Stereo-Position (-1 links … +1 rechts)
+  if (!pan || !actx.createStereoPanner) return actx.destination;
+  const p = actx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); p.connect(actx.destination); return p;
+}
+function sfxNoise(dur, freq, vol, type = 'lowpass', q = 0.7, pan = 0) {
   if (!actx) return; const s = actx.createBufferSource(); s.buffer = noiseBuf(dur);
   const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
   const g = actx.createGain(); g.gain.setValueAtTime(vol, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-  s.connect(f); f.connect(g); g.connect(actx.destination); s.start();
+  s.connect(f); f.connect(g); g.connect(outNode(pan)); s.start();
 }
-function sfxTone(freq, dur, vol, type = 'sine', slide = 0) {
+function sfxTone(freq, dur, vol, type = 'sine', slide = 0, pan = 0) {
   if (!actx) return; const o = actx.createOscillator(), g = actx.createGain();
   o.type = type; o.frequency.setValueAtTime(freq, actx.currentTime);
   if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), actx.currentTime + dur);
   g.gain.setValueAtTime(vol, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-  o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + dur);
+  o.connect(g); g.connect(outNode(pan)); o.start(); o.stop(actx.currentTime + dur);
 }
 const SFX = {
   shot(k) { const big = k === 3 ? 1 : k === 2 ? 0.8 : 0.6; sfxNoise(0.25 + big * 0.15, k === 3 ? 1400 : 3000, 0.9 * big, 'lowpass'); sfxTone(k === 3 ? 90 : 140, 0.18, 0.6 * big, 'sine', -80); },
@@ -841,7 +847,8 @@ const SFX = {
   reload(phase) { if (phase === 0) { sfxNoise(0.08, 2500, 0.4, 'bandpass', 3); sfxTone(300, 0.08, 0.2, 'square'); } else { sfxNoise(0.1, 1800, 0.5, 'bandpass', 3); sfxTone(520, 0.06, 0.25, 'square'); } },
   hit() { sfxNoise(0.1, 600, 0.5); },
   zhurt() { sfxTone(160, 0.25, 0.25, 'sawtooth', -60); },
-  groan(vol) { sfxTone(rr(70, 110), 0.7, 0.18 * vol, 'sawtooth', -25); },
+  groan(vol, pan) { sfxTone(rr(70, 110), 0.7, 0.2 * vol, 'sawtooth', -25, pan); },
+  step(vol, pan, run) { sfxNoise(run ? 0.07 : 0.1, run ? 380 : 240, 0.55 * vol, 'lowpass', 0.8, pan); sfxTone(run ? 95 : 70, 0.08, 0.35 * vol, 'sine', -30, pan); },
   pain() { sfxNoise(0.18, 400, 0.7); sfxTone(110, 0.2, 0.4, 'sine', -50); },
   pickup() { sfxTone(660, 0.1, 0.25, 'triangle'); setTimeout(() => sfxTone(990, 0.12, 0.25, 'triangle'), 90); },
   death() { sfxTone(200, 0.9, 0.4, 'sawtooth', -150); },
@@ -1089,6 +1096,20 @@ function killZombie(z, head) {
 }
 function noise(pos, radius) { for (const z of zombies) if (z.state === 'wander' && z.pos.distanceTo(pos) < radius) { z.state = 'chase'; } }
 
+/* Zombie-Geräusche: nur die nächsten Zombies (max. CONFIG.soundVoices) sind hörbar, Lautstärke nach Entfernung, Stereo-Richtung */
+const audible = new Set(); let audT = 0;
+function updateAudible(dt) {
+  audT -= dt; if (audT > 0) return; audT = 0.15; audible.clear();
+  const list = [];
+  for (const z of zombies) { if (z.state === 'dead' || z.state === 'dying') continue; const d = Math.hypot(z.pos.x - player.pos.x, z.pos.z - player.pos.z); if (d < CONFIG.soundRange) list.push([d, z]); }
+  list.sort((a, b) => a[0] - b[0]);
+  for (let i = 0; i < Math.min(CONFIG.soundVoices, list.length); i++) audible.add(list[i][1]);
+}
+function audioOf(z, dist) {
+  const dx = z.pos.x - player.pos.x, dz = z.pos.z - player.pos.z, d = Math.max(0.5, dist);
+  const f = Math.max(0, 1 - d / CONFIG.soundRange);
+  return { vol: f * f, pan: (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / d * Math.min(1, 4 / d + 0.5) };
+}
 function updateZombie(z, dt) {
   const pp = player.pos; const dx = pp.x - z.pos.x, dz = pp.z - z.pos.z; const dist = Math.hypot(dx, dz);
   z.t += dt; z.phase += dt * (z.state === 'chase' ? z.speed * 2.2 : 3);
@@ -1103,7 +1124,7 @@ function updateZombie(z, dt) {
   if (player.dead) z.state = 'wander';
   if (z.stun > 0) { z.stun -= dt; return; }
   z.atkCd -= dt; z.groanT -= dt;
-  if (z.groanT <= 0) { z.groanT = rr(5, 12); if (dist < 40) SFX.groan(1 - dist / 40); }
+  if (z.groanT <= 0) { z.groanT = rr(5, 12); if (audible.has(z)) { const a = audioOf(z, dist); SFX.groan(a.vol, a.pan); } }
   if (z.state === 'wander') {
     if (dist < 18 || (dist < 30 && Math.abs(Math.atan2(dx, dz) - z.yaw) < 1)) z.state = 'chase';
     if (z.pos.distanceTo(z.wander) < 1 || z.t > 8) { z.wander.set(z.pos.x + rr(-12, 12), 0, z.pos.z + rr(-12, 12)); z.t = 0; }
@@ -1123,6 +1144,8 @@ function updateZombie(z, dt) {
     z.atkCd = 1.1; z.atkAnim = 0.45;
     setTimeout(() => { if (z.state === 'attack' && !player.dead && z.hp > 0 && Math.hypot(player.pos.x - z.pos.x, player.pos.z - z.pos.z) < 2) hurtPlayer(z.dmg); }, 300);
   }
+  const stepIdx = Math.floor(z.phase / Math.PI); // Schritt bei jedem Beinwechsel – nur für die nächsten Zombies hörbar
+  if (stepIdx !== z.stepIdx) { z.stepIdx = stepIdx; if (z.state !== 'attack' && audible.has(z)) { const a = audioOf(z, dist); SFX.step(a.vol, a.pan, z.runner); } }
   for (const o of zombies) { if (o === z || o.state === 'dead' || o.state === 'dying') continue; const ox = z.pos.x - o.pos.x, oz = z.pos.z - o.pos.z, d2 = ox * ox + oz * oz; if (d2 < 0.55 && d2 > 1e-6) { const d = Math.sqrt(d2); z.pos.x += ox / d * 0.5 * dt * 2; z.pos.z += oz / d * 0.5 * dt * 2; } }
   resolveCircle(z.pos, 0.38, 0, 0.3);
   // Hängen geblieben? -> seitlich ausweichen
@@ -1358,6 +1381,7 @@ function update(dt) {
   view.rotation.set(player.recoilKick * 0.05 + rl * 0.6, 0, rl * -0.2);
   if (player.flashT > 0) { player.flashT -= dt; if (player.flashT <= 0) { flash.visible = false; flashLight.intensity = 0; } }
   // Zombies
+  updateAudible(dt);
   for (const z of zombies) updateZombie(z, dt);
   for (let i = zombies.length - 1; i >= 0; i--) if (zombies[i].gone) zombies.splice(i, 1);
   waves.update(dt); updatePickups(dt);
