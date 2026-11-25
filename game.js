@@ -678,12 +678,12 @@ let MAP = MAPS.big, HALF = MAP.size / 2, mapId = null;
 const mapRoot = new THREE.Group(); scene.add(mapRoot);
 function disposeMap() {
   mapRoot.traverse((o) => { if (o.geometry) o.geometry.dispose(); for (const m of (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [])) { if (m.map) m.map.dispose(); m.dispose(); } });
-  mapRoot.clear(); boxes.length = 0; interiorSpots.length = 0; phongCache.clear();
+  mapRoot.clear(); boxes.length = 0; interiorSpots.length = 0; phongCache.clear(); FACADE.mats = []; FACADE.neon = []; FACADE.pools = [];
   Object.assign(LAMP, { list: [], alive: [], flick: [], lights: [], ready: false, pools: null, halos: null, haloCol: null });
 }
 function loadMap(id) {
   disposeMap(); MAP = MAPS[id]; HALF = MAP.size / 2; mapId = id; seed = 1337;
-  buildGround(); buildCity(); applyShaderTo(mapRoot); applyLampNight(settings.night);
+  buildGround(); buildCity(); applyShaderTo(mapRoot); applyLampNight(settings.night); applyFacadeNight(settings.night);
 }
 const boxes = []; // Kollision: {x0,x1,z0,z1,top}
 function addBox(cx, cz, w, d, top) { boxes.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, top }); }
@@ -768,19 +768,72 @@ function buildGround() {
   outer.rotation.x = -Math.PI / 2; outer.position.y = -0.05; mapRoot.add(outer);
 }
 
+const FLOOR_H = 3.4, TILE_W = 12, TILE_H = 6.8;
+const FACADE = { mats: [], neon: [], pools: [] };
+const NEON_WORDS = [['CAFFE', '#ff4fa8'], ['CAFFE', '#ffb347'], ['BAR', '#35e0ff'], ['PIZZA', '#ff5a3c'], ['PUB', '#5dff7a'], ['DINER', '#ff4fa8'], ['HOTEL', '#35e0ff'], ['KIOSK', '#ffe14d'], ['BURGER', '#ff8a2a'], ['OPEN 24h', '#5dff7a'], ['APOTHEKE', '#4dff9a'], ['TABAK', '#ff4f4f']];
+// Fassade: 12 m x 6.8 m Kachel (2 Etagen a 3,4 m, 4 Fenster je Etage = 8 Fenster, genau 1 Fenster beleuchtet)
 function facadeTexture(base, lit) {
-  return canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = base; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(0,0,0,${rnd() * .08})`; g.fillRect(rnd() * w, rnd() * h, rr(2, 10), rr(2, 10)); }
-    for (let y = 8; y < h; y += 32) for (let x = 8; x < w; x += 32) {
-      const r = rnd();
-      g.fillStyle = r < .12 ? lit : r < .25 ? '#0b0d10' : '#1a2229';
-      g.fillRect(x, y, 18, 22);
-      if (r > .6) { g.strokeStyle = '#000'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 18, y + 22); g.moveTo(x + 18, y); g.lineTo(x + 6, y + 14); g.stroke(); }
-      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x - 2, y + 22, 22, 3);
-    }
-    if (rnd() < .7) { g.fillStyle = 'rgba(30,22,16,.3)'; g.fillRect(0, h * rr(.5, .9), w, h); }
+  const PX = 40, W = TILE_W * PX, H = TILE_H * PX;
+  const litIdx = (rnd() * 8) | 0;
+  const wins = []; for (let f = 0; f < 2; f++) for (let c = 0; c < 4; c++) wins.push({ x: (1.5 + 3 * c - 0.7) * PX, y: (TILE_H - 2.3 - FLOOR_H * f) * PX, w: 1.4 * PX, h: 1.4 * PX, f, c });
+  const kinds = wins.map(() => rnd());
+  const map = canvasTex(W, H, (g) => {
+    g.fillStyle = base; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 700; i++) { g.fillStyle = `rgba(0,0,0,${rnd() * .07})`; g.fillRect(rnd() * W, rnd() * H, rr(4, 30), rr(4, 30)); }
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(0, H - 0.3 * PX, W, 0.3 * PX); g.fillRect(0, (TILE_H - FLOOR_H - 0.12) * PX, W, 0.12 * PX); // Sockel + Geschossband
+    wins.forEach((q, i) => {
+      g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(q.x - 5, q.y - 4, q.w + 10, q.h + 10);          // Laibung
+      g.fillStyle = '#d0cdc4'; g.fillRect(q.x - 6, q.y + q.h + 4, q.w + 12, 7);                   // Fensterbank
+      if (i === litIdx) { const gr = g.createLinearGradient(0, q.y, 0, q.y + q.h); gr.addColorStop(0, lit); gr.addColorStop(1, '#fff3cf'); g.fillStyle = gr; }
+      else g.fillStyle = kinds[i] < .3 ? '#07090c' : '#1d2830';
+      g.fillRect(q.x, q.y, q.w, q.h);
+      if (i !== litIdx && kinds[i] >= .3) { g.fillStyle = 'rgba(160,190,210,.12)'; g.beginPath(); g.moveTo(q.x, q.y + q.h); g.lineTo(q.x + q.w * .55, q.y); g.lineTo(q.x + q.w * .8, q.y); g.lineTo(q.x + q.w * .25, q.y + q.h); g.fill(); }
+      g.fillStyle = i === litIdx ? 'rgba(70,45,10,.85)' : '#0d0f12'; g.fillRect(q.x + q.w / 2 - 2, q.y, 4, q.h); g.fillRect(q.x, q.y + q.h * .42, q.w, 4); // Rahmenkreuz
+      if (i === litIdx) { g.fillStyle = 'rgba(40,25,10,.5)'; g.fillRect(q.x, q.y, q.w * .18, q.h); }
+      else if (kinds[i] > .8) { g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(q.x + 3, q.y + 3); g.lineTo(q.x + q.w - 8, q.y + q.h * .6); g.moveTo(q.x + q.w - 4, q.y + 4); g.lineTo(q.x + q.w * .4, q.y + q.h - 4); g.stroke(); }   // zerbrochen
+      else if (kinds[i] > .68) { g.fillStyle = '#4b3a28'; for (let b = 0; b < 4; b++) g.fillRect(q.x - 2, q.y + b * q.h / 4 + 2, q.w + 4, q.h / 4 - 4); } // zugenagelt
+    });
+    if (rnd() < .7) { const gr = g.createLinearGradient(0, H * .6, 0, H); gr.addColorStop(0, 'rgba(30,22,16,0)'); gr.addColorStop(1, 'rgba(30,22,16,.35)'); g.fillStyle = gr; g.fillRect(0, H * .6, W, H * .4); }
   }, true);
+  const em = canvasTex(W, H, (g) => {
+    g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+    const q = wins[litIdx]; g.fillStyle = lit; g.fillRect(q.x, q.y, q.w, q.h);
+    g.fillStyle = '#000'; g.fillRect(q.x + q.w / 2 - 2, q.y, 4, q.h); g.fillRect(q.x, q.y + q.h * .42, q.w, 4);
+  }, true);
+  return { map, em };
+}
+// Fassadenmaterial (Lambert + Emissive-Map fuer das beleuchtete Fenster, nachts an)
+function facadeMat(F, rx, ry, ox, oy) {
+  const t = F.map.clone(), e = F.em.clone();
+  for (const x of [t, e]) { x.repeat.set(rx, ry); x.offset.set(ox || 0, oy || 0); x.needsUpdate = true; }
+  const m = new THREE.MeshLambertMaterial({ map: t, emissiveMap: e, emissive: settings.night ? 0xffffff : 0x000000 });
+  FACADE.mats.push(m); return m;
+}
+function applyFacadeNight(n) {
+  for (const m of FACADE.mats) { const p = phongCache.get(m); m.emissive.setHex(n ? 0xffffff : 0); if (p) p.emissive.setHex(n ? 0xffffff : 0); }
+  for (const m of FACADE.neon) m.color.setHex(n ? 0xffffff : 0xb8b8b8);
+  for (const o of FACADE.pools) o.visible = n;
+}
+// Vordach mit Neon-Reklame ueber einem Eingang. dir: Richtung nach aussen (x/z), (px,pz) = Tuermitte an der Aussenwand
+function addCanopy(px, pz, ax, az, k) {
+  const [word, col] = NEON_WORDS[k % NEON_WORDS.length], g = new THREE.Group();
+  const horiz = az !== 0, D = 1.4, Wd = 3.4;
+  const dark = lambert(0x2b2d30);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(Wd, 0.12, D), dark); roof.position.set(0, 2.95, D / 2); g.add(roof);
+  for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, D), dark); st.position.set(sx * (Wd / 2 - 0.05), 2.65, D / 2); st.rotation.x = 0; g.add(st); }
+  const tex = canvasTex(512, 128, (c, w, h) => {
+    c.fillStyle = '#0a0a0e'; c.fillRect(0, 0, w, h);
+    c.strokeStyle = col; c.lineWidth = 4; c.shadowColor = col; c.shadowBlur = 14; c.strokeRect(8, 8, w - 16, h - 16);
+    let fs = 84; c.font = `bold ${fs}px Arial, sans-serif`; while (c.measureText(word).width > w - 50 && fs > 20) { fs -= 4; c.font = `bold ${fs}px Arial, sans-serif`; }
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.shadowBlur = 22; c.fillStyle = col; c.fillText(word, w / 2, h / 2 + 4); c.shadowBlur = 6; c.fillStyle = '#fff'; c.globalAlpha = .75; c.fillText(word, w / 2, h / 2 + 4);
+  }, false);
+  const sm = new THREE.MeshBasicMaterial({ map: tex, color: settings.night ? 0xffffff : 0xb8b8b8 }); FACADE.neon.push(sm);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.7, 0.1), [dark, dark, dark, dark, sm, sm]); sign.position.set(0, 3.5, D - 0.1); g.add(sign);
+  for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.05), dark); st.position.set(sx * 1.2, 3.2, D - 0.1); g.add(st); }
+  g.position.set(px, 0, pz); g.rotation.y = Math.atan2(ax, az); mapRoot.add(g);
+  // Lichtschein auf dem Boden (nur nachts)
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(7, 7).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: radialTex(64, [[0, col + 'aa'], [0.5, col + '44'], [1, col + '00']]), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  pool.position.set(px + ax * 2.2, 0.06, pz + az * 2.2); pool.visible = !!settings.night; mapRoot.add(pool); FACADE.pools.push(pool);
 }
 
 /* ---- Begehbare Gebäude: Erdgeschoss mit 4 Eingängen, Fluren, Räumen und Möbeln ---- */
@@ -811,7 +864,7 @@ function interiorMats() {
 function buildEnterable(cx, cz, w, d, h, tex) {
   const M = interiorMats(), roofMat = lambert(0x3b3a38);
   const H = 3.4, T = 0.4, CW = 2.6, DOORW = 2.2, DOORH = 2.6, IT = 0.2, RD = 1.3;
-  const segMat = (len, ht) => { const t = tex.clone(); t.repeat.set(Math.max(0.5, len / 4), ht / 4); t.needsUpdate = true; return new THREE.MeshLambertMaterial({ map: t }); };
+  const segMat = (len, ht) => facadeMat(tex, Math.max(0.05, len / TILE_W), ht / TILE_H, 0, 0);
   const solid = (x0, x1, z0, z1, y0, y1, mat, collide = true) => {
     if (x1 - x0 < 0.001 || z1 - z0 < 0.001) return;
     const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat === 'facade' ? segMat(Math.max(x1 - x0, z1 - z0), y1 - y0) : mat);
@@ -834,8 +887,7 @@ function buildEnterable(cx, cz, w, d, h, tex) {
   wallZ(cx - hw, cx - hw + T, cz - hd + T, cz + hd - T, cz, DOORW, 'facade');
   wallZ(cx + hw - T, cx + hw, cz - hd + T, cz + hd - T, cz, DOORW, 'facade');
   // Obergeschosse (massiv) + Decke
-  const hu = h - H, t1 = tex.clone(), t2 = tex.clone(); t1.repeat.set(w / 4, hu / 4); t2.repeat.set(d / 4, hu / 4); t1.needsUpdate = t2.needsUpdate = true;
-  const mA = new THREE.MeshLambertMaterial({ map: t1 }), mB = new THREE.MeshLambertMaterial({ map: t2 });
+  const hu = h - H, mA = facadeMat(tex, w / TILE_W, hu / TILE_H, 0, H / TILE_H), mB = facadeMat(tex, d / TILE_W, hu / TILE_H, 0, H / TILE_H);
   const up = new THREE.Mesh(new THREE.BoxGeometry(w, hu, d), [mB, mB, roofMat, M.ceil, mA, mA]); up.position.set(cx, H + hu / 2, cz); mapRoot.add(up);
   boxes.push({ x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, top: h, y0: H });
   const fl = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * T, 0.04, d - 2 * T), M.floor); fl.position.set(cx, 0.02, cz); mapRoot.add(fl);
@@ -894,6 +946,9 @@ function buildEnterable(cx, cz, w, d, h, tex) {
   // Flurobjekte
   if (rnd() < 0.7) chair(cx + rr(-0.4, 0.4), cz - hd + T + 1.6, true);
   if (rnd() < 0.6) cabinet(cx + RD - 0.3, cz + hd - T - 0.4, 0.5, 0.6, 1.0, lambert(0x6b5a3c));
+  { const cr = mkRng(hashXZ(cx, cz) + 77); // Vordaecher mit Neon-Reklame (eigener RNG)
+    const doors = [[cx, cz - hd, 0, -1], [cx, cz + hd, 0, 1], [cx - hw, cz, -1, 0], [cx + hw, cz, 1, 0]];
+    doors.forEach(([px, pz, ax, az]) => { if (cr() < 0.5) addCanopy(px, pz, ax, az, (cr() * 99) | 0); }); }
   interiorSpots.push({ x: cx, z: cz });
   if (rnd() < 0.5) interiorSpots.push({ x: cx + (rnd() < 0.5 ? -1 : 1) * 3.2, z: cz + 0.0 });
   if (rnd() < 0.5) { const a = new THREE.Mesh(new THREE.BoxGeometry(w * .3, 2, d * .3), roofMat); a.position.set(cx + rr(-w / 4, w / 4), h + 1, cz + rr(-d / 4, d / 4)); mapRoot.add(a); }
@@ -906,10 +961,9 @@ function buildCity() {
   let houseCount = 0;
   const addBuilding = (cx, cz, w, d, h, canEnter) => {
     const tex = facadeTexture(bases[(rnd() * bases.length) | 0], lits[(rnd() * 2) | 0]);
-    if (canEnter && w >= 12 && d >= 12 && ++houseCount % 3 === 0) { buildEnterable(cx, cz, w, d, Math.max(h, 8), tex); return; }
-    const side = tex.clone(); side.needsUpdate = true;
-    tex.repeat.set(w / 4, h / 4); side.repeat.set(d / 4, h / 4);
-    const mats = [side, side, null, null, tex, tex].map((t) => (t ? new THREE.MeshLambertMaterial({ map: t }) : roofMat));
+    h = Math.max(2, Math.round(h / FLOOR_H)) * FLOOR_H; // ganze Etagen -> Fenster auf realistischer Hoehe
+    if (canEnter && w >= 12 && d >= 12 && ++houseCount % 3 === 0) { buildEnterable(cx, cz, w, d, Math.max(h, 3 * FLOOR_H), tex); return; }
+    const mats = [facadeMat(tex, d / TILE_W, h / TILE_H), facadeMat(tex, d / TILE_W, h / TILE_H), roofMat, roofMat, facadeMat(tex, w / TILE_W, h / TILE_H), facadeMat(tex, w / TILE_W, h / TILE_H)];
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
     m.position.set(cx, h / 2, cz); mapRoot.add(m);
     addBox(cx, cz, w, d, h);
@@ -1908,6 +1962,7 @@ function applyTime() {
   }
   stars.visible = n;
   applyLampNight(n);
+  applyFacadeNight(n);
   applyBackdropNight(n);
 }
 
@@ -1922,7 +1977,7 @@ const SHADERS = {
 const phongCache = new Map();
 function phongOf(m) {
   let p = phongCache.get(m);
-  if (!p) { p = new THREE.MeshPhongMaterial({ color: m.color, map: m.map, alphaTest: m.alphaTest, vertexColors: m.vertexColors, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits }); p.userData.orig = m; phongCache.set(m, p); }
+  if (!p) { p = new THREE.MeshPhongMaterial({ color: m.color, map: m.map, alphaTest: m.alphaTest, vertexColors: m.vertexColors, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits, emissive: m.emissive, emissiveMap: m.emissiveMap }); p.userData.orig = m; phongCache.set(m, p); }
   return p;
 }
 function applyShaderTo(root) {
