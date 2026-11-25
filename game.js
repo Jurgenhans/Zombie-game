@@ -894,52 +894,59 @@ function sfxPing(freqs, dur, vol, pan = 0, delay = 0) {
     o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + d + 0.02);
   });
 }
-// Stimme (Zombie-Stöhnen): Sägezahn-Quelle mit Vibrato, Verzerrung (Rauheit) und Formantfiltern + Atemrauschen
+// Stimme (Zombie-Stöhnen): Sägezahn mit Vibrato, starker Verzerrung, Knarz-Amplitudenmodulation, Formantfiltern, kratzigem Atem – kurz & trocken (kein Nachhall)
 const _curves = {};
-function sfxVoice({ f0 = 80, glide = -20, dur = 1.2, vol = 0.2, pan = 0, form = [[500, 7], [1100, 8], [2400, 9]], rasp = 8, breath = 0.25, vib = 5, delay = 0, attack = 0.12 } = {}) {
+function sfxVoice({ f0 = 80, glide = -20, dur = 1.0, vol = 0.2, pan = 0, form = [[500, 7], [1100, 8], [2400, 9]], rasp = 18, breath = 0.45, vib = 6, delay = 0, attack = 0.06, growl = 0.6 } = {}) {
   if (!actx || vol < 0.004) return; const t0 = actx.currentTime + delay, t1 = t0 + dur, out = outNode(pan);
   const osc = actx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(f0, t0); osc.frequency.linearRampToValueAtTime(Math.max(30, f0 + glide), t1);
-  const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = vib + Math.random() * 2; lg.gain.value = f0 * 0.05; lfo.connect(lg); lg.connect(osc.frequency);
+  const lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = vib + Math.random() * 2; lg.gain.value = f0 * 0.06; lfo.connect(lg); lg.connect(osc.frequency);
   const sh = actx.createWaveShaper();
   if (!_curves[rasp]) { const c = new Float32Array(257); for (let i = 0; i < 257; i++) c[i] = Math.tanh(rasp * (i / 128 - 1)); _curves[rasp] = c; }
   sh.curve = _curves[rasp]; osc.connect(sh);
-  const env = actx.createGain(); env.gain.setValueAtTime(0.0001, t0); env.gain.linearRampToValueAtTime(vol, t0 + attack); env.gain.exponentialRampToValueAtTime(0.001, t1);
+  // Knarzen: schnelle Amplitudenmodulation (Stimmbandflattern)
+  const am = actx.createGain(); am.gain.value = 1 - growl * 0.5; const amL = actx.createOscillator(), amG = actx.createGain();
+  amL.type = 'square'; amL.frequency.value = 28 + Math.random() * 30; amG.gain.value = growl * 0.5; amL.connect(amG); amG.connect(am.gain);
+  // Hüllkurve: schneller Einsatz, kurzer Abfall, KEIN langer Ausklang
+  const env = actx.createGain(); env.gain.setValueAtTime(0.0001, t0); env.gain.linearRampToValueAtTime(vol, t0 + attack);
+  env.gain.linearRampToValueAtTime(vol * 0.75, Math.max(t0 + attack + 0.01, t1 - 0.12)); env.gain.linearRampToValueAtTime(0.0001, t1);
   const mix = actx.createGain(); mix.gain.value = 1;
   for (const [fr, q] of form) {
-    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(fr, t0); bp.frequency.linearRampToValueAtTime(fr * 0.85, t1);
-    const fg = actx.createGain(); fg.gain.value = 3.5; sh.connect(bp); bp.connect(fg); fg.connect(mix);
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q * 0.5; bp.frequency.setValueAtTime(fr, t0); bp.frequency.linearRampToValueAtTime(fr * 0.88, t1);
+    const fg = actx.createGain(); fg.gain.value = 2.6; sh.connect(bp); bp.connect(fg); fg.connect(mix);
   }
-  mix.connect(env); env.connect(out);
-  if (breath > 0) { // Atem
+  mix.connect(am); am.connect(env); env.connect(out);
+  if (breath > 0) { // kratziger Atem (hohes Rauschen)
     const n = actx.createBufferSource(), bf = actx.createBiquadFilter(), bg = actx.createGain();
-    bf.type = 'bandpass'; bf.frequency.value = 1500; bf.Q.value = 0.7; bg.gain.setValueAtTime(0.0001, t0); bg.gain.linearRampToValueAtTime(breath * vol, t0 + attack); bg.gain.exponentialRampToValueAtTime(0.001, t1);
+    bf.type = 'bandpass'; bf.frequency.value = 2600; bf.Q.value = 0.6; bg.gain.setValueAtTime(0.0001, t0); bg.gain.linearRampToValueAtTime(breath * vol, t0 + attack); bg.gain.linearRampToValueAtTime(0.0001, t1);
     n.connect(bf); bf.connect(bg); bg.connect(out); noiseStart(n, t0, dur);
   }
-  osc.start(t0); lfo.start(t0); osc.stop(t1 + 0.05); lfo.stop(t1 + 0.05);
+  osc.start(t0); lfo.start(t0); amL.start(t0); osc.stop(t1 + 0.05); lfo.stop(t1 + 0.05); amL.stop(t1 + 0.05);
 }
 const VOWELS = [[[700, 8], [1200, 9], [2600, 10]], [[350, 7], [800, 8], [2400, 10]], [[450, 7], [900, 8], [2500, 10]], [[500, 8], [1700, 9], [2500, 10]]];
 const SFX = {
   shot(k) { const big = k === 3 ? 1 : k === 2 ? 0.8 : 0.6; sfxNoise(0.25 + big * 0.15, k === 3 ? 1400 : 3000, 0.9 * big, 'lowpass'); sfxTone(k === 3 ? 90 : 140, 0.18, 0.6 * big, 'sine', -80); },
   empty() { sfxPing([2600, 4100], 0.03, 0.25); sfxNoise(0.015, 3500, 0.2, 'highpass'); },
-  // Nachlade-Bausteine (synthetisch, ohne Piepstöne: Rauschen + kurze Metall-/Holz-Anschläge)
-  rClick() { sfxPing([3200, 5100], 0.03, 0.25); sfxNoise(0.015, 3000, 0.25, 'highpass'); },                      // Magazin-Haltung / Sicherung
-  rClack() { sfxPing([1800, 2900, 4300], 0.07, 0.35); sfxNoise(0.03, 2500, 0.4, 'bandpass', 2); },              // Metall auf Metall
-  rThunk() { sfxNoise(0.08, 500, 0.5, 'lowpass'); sfxPing([110], 0.12, 0.5); },                                 // Magazin einsetzen
-  rOut()   { sfxNoise(0.12, 1200, 0.25, 'bandpass', 1, 0, 0, 0.02); sfxPing([2200], 0.03, 0.15); },             // Magazin herausziehen
-  rScrape() { sfxNoise(0.22, 2800, 0.22, 'bandpass', 0.8, 0, 0, 0.04); },                                       // Schlitten/Verschluss zurück
-  rShell() { sfxPing([1400, 2100], 0.05, 0.2); sfxNoise(0.04, 1800, 0.3, 'bandpass', 3); sfxPing([140], 0.1, 0.25, 0, 0.03); }, // Patrone in Schrotflinte
-  rRustle() { sfxNoise(0.15, 2000, 0.12, 'bandpass', 0.5, 0, 0, 0.05); },
+  // Nachlade-Bausteine: mechanisch – kurze, trockene Metall-Transienten, Ratschen, Federn; keine Töne mit Ausklang
+  tick(f, v, d = 0) { sfxNoise(0.012, f, v, 'bandpass', 3, 0, d); sfxPing([f * 1.4], 0.015, v * 0.6, 0, d); },
+  rattle(n, sp, f, v, d = 0) { for (let i = 0; i < n; i++) SFX.tick(f * (1 + i * 0.04), v, d + i * sp); },
+  rClick() { SFX.tick(3800, 0.35); SFX.tick(2600, 0.2, 0.012); },                                                                   // Magazinhalter-Knopf
+  rOut()   { sfxNoise(0.14, 1800, 0.25, 'bandpass', 1.4, 0, 0, 0.01); SFX.rattle(4, 0.03, 2200, 0.12); SFX.tick(3000, 0.25, 0.13); }, // Magazin gleitet heraus
+  rRustle() { SFX.rattle(2, 0.03, 3000, 0.12); },                                                                                   // Fummeln
+  rThunk() { sfxNoise(0.03, 1400, 0.6, 'bandpass', 1.2); sfxPing([900, 1700], 0.035, 0.35); sfxPing([120], 0.06, 0.55); SFX.tick(3200, 0.3, 0.045); }, // Magazin rastet ein
+  rScrape() { sfxNoise(0.2, 2400, 0.2, 'bandpass', 1, 0, 0, 0.03); SFX.rattle(7, 0.026, 2800, 0.22); },                              // Spannschieber zurück (Ratsche)
+  rClack() { sfxNoise(0.035, 2200, 0.7, 'bandpass', 1.5); sfxPing([1400, 2300, 3300], 0.045, 0.4); sfxPing([160], 0.05, 0.5); SFX.rattle(2, 0.02, 3500, 0.12, 0.05); }, // Verschluss schnappt vor
+  rShell() { SFX.tick(2400, 0.3); sfxPing([180], 0.05, 0.3, 0, 0.01); SFX.tick(3200, 0.2, 0.04); },                                  // Patrone in Magazinrohr
   // Treffer & Zombie-Geräusche
   hit(vol = 1, pan = 0) { sfxNoise(0.09, 450, 0.65 * vol, 'lowpass', 0.7, pan); sfxNoise(0.05, 1100, 0.3 * vol, 'bandpass', 1.2, pan, 0.01); sfxPing([95], 0.1, 0.4 * vol, pan); },
-  zhurt(vol = 1, pan = 0) { sfxVoice({ f0: 130, glide: -40, dur: 0.35, vol: 0.3 * vol, pan, form: VOWELS[0], attack: 0.03, rasp: 12, breath: 0.3, vib: 7 }); },
-  groan(vol, pan) { sfxVoice({ f0: rr(60, 95), glide: rr(-28, -6), dur: rr(0.9, 1.7), vol: 0.3 * vol, pan, form: VOWELS[(Math.random() * VOWELS.length) | 0], rasp: rr(6, 12), breath: 0.3 }); },
+  zhurt(vol = 1, pan = 0) { sfxVoice({ f0: 130, glide: -40, dur: 0.3, vol: 0.2 * vol, pan, form: VOWELS[0], attack: 0.02, rasp: 20, breath: 0.5, vib: 7 }); },
+  groan(vol, pan) { sfxVoice({ f0: rr(60, 95), glide: rr(-28, -6), dur: rr(0.7, 1.2), vol: 0.17 * vol, pan, form: VOWELS[(Math.random() * VOWELS.length) | 0], rasp: rr(14, 24), breath: 0.5, growl: rr(0.5, 0.8) }); },
   step(vol, pan, run) {
     sfxNoise(run ? 0.06 : 0.09, run ? 520 : 380, 0.7 * vol, 'lowpass', 0.8, pan);                              // Ferse
     sfxPing([run ? 85 : 62], 0.1, 0.55 * vol, pan);                                                            // Körper-Dump
     sfxNoise(0.1, 2600, 0.18 * vol, 'highpass', 0.7, pan, run ? 0.025 : 0.045, 0.01);                          // Schleifen/Kiesel
   },
   death(vol = 1, pan = 0) {
-    sfxVoice({ f0: 110, glide: -55, dur: 1.5, vol: 0.38 * vol, pan, form: VOWELS[0], rasp: 10, breath: 0.35, attack: 0.08 });
+    sfxVoice({ f0: 110, glide: -55, dur: 1.1, vol: 0.24 * vol, pan, form: VOWELS[0], rasp: 20, breath: 0.5, attack: 0.04, growl: 0.7 });
     sfxNoise(0.2, 260, 0.6 * vol, 'lowpass', 0.7, pan, 0.7); sfxPing([55], 0.25, 0.5 * vol, pan, 0.7);        // Aufprall
   },
   pain() { sfxNoise(0.12, 500, 0.8); sfxPing([70], 0.18, 0.6); sfxNoise(0.35, 1200, 0.22, 'bandpass', 0.8, 0, 0.08, 0.06); },
