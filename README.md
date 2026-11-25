@@ -13,3 +13,26 @@ Ego-Shooter in Three.js, per Capacitor als Android-APK verpackt (GitHub Actions:
 ## Wellen & Zombie-Modelle (später)
 In `game.js` → `CONFIG.wavesEnabled = true` aktiviert das fertige Wellensystem. Bis dahin stehen `trainingZombies` als Übungsziele auf der Map (`0` = keine).
 Zombies kommen aus dem eingebauten Generator (`zombiegen.js`, 300 Varianten, zur Laufzeit erzeugt). Fallbacks: `assets/models/zombie.glb`, dann prozedurales Modell.
+
+## Code-Struktur
+
+`game.js` ist nur der Einstieg (lädt Modelle, startet die Schleife). Der Rest liegt in `js/`:
+
+| Datei | Inhalt |
+|---|---|
+| `config.js` | CONFIG, WEAPONS, Einstellungen (settings) |
+| `core.js` | Renderer, Szene, Kamera, Zufall, Hilfsfunktionen |
+| `state.js` | `player` und geteilter Spielzustand `S` |
+| `mapdata.js`, `world.js` | Karten, Boden, Bordstein, Stadt aufbauen |
+| `buildings.js` | Fassaden, begehbare Häuser, Neon-Vordächer |
+| `props.js`, `lamps.js`, `backdrop.js` | Autos, Kisten, Fässer, Bäume, Laternen, Randkulisse |
+| `physics.js` | Kollision und Strahlen |
+| `audio.js`, `effects.js` | Sounds, Partikel, Einschusslöcher |
+| `models.js` | Humanoid/Zombie-Modelle laden |
+| `weapons.js` | Waffenmodelle, Schießen, Nachladen |
+| `zombies.js`, `pickups.js` | Zombie-Logik, Wellen, Aufsammelobjekte |
+| `input.js`, `hud.js`, `options.js` | Steuerung, Anzeige, Optionen-Menü |
+| `environment.js`, `shader.js` | Himmel/Tag-Nacht, Shader |
+| `flow.js` | Spielablauf (Start, Update, Hauptschleife) |
+
+Außerdem im Hauptordner: `zombiegen.js` (Zombie-Generator), `trash.js` (Müll).
