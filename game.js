@@ -1060,9 +1060,9 @@ function scatterTrash() {
       T[k].push({ x, y: y + fy + (blockedH(x, z)), z, rx, ry: yaw, rz, sx, sy, sz, c });
     }
   };
-  const nCl = Math.round(95 * AF) + 4;
+  const nCl = (Math.round(95 * AF) + 4) * 10; // 10x Müll
   for (let i = 0; i < nCl; i++) { const x = (r() - 0.5) * 2 * (MAP.edge - 3), z = (r() - 0.5) * 2 * (MAP.edge - 3); place(x, z, 3 + ((r() * 7) | 0), 1.2, 0); }
-  for (const sp of interiorSpots) for (let i = 0; i < 2; i++) place(sp.x + (r() - 0.5) * 6, sp.z + (r() - 0.5) * 6, 4 + ((r() * 4) | 0), 1.4, 0.04); // auch in den Häusern
+  for (const sp of interiorSpots) for (let i = 0; i < 20; i++) place(sp.x + (r() - 0.5) * 6, sp.z + (r() - 0.5) * 6, 4 + ((r() * 4) | 0), 1.4, 0.04); // auch in den Häusern
   const d = new THREE.Object3D(), col = new THREE.Color();
   for (const k of keys) {
     const list = T[k]; if (!list.length) continue;
