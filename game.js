@@ -678,7 +678,7 @@ let MAP = MAPS.big, HALF = MAP.size / 2, mapId = null;
 const mapRoot = new THREE.Group(); scene.add(mapRoot);
 function disposeMap() {
   mapRoot.traverse((o) => { if (o.geometry) o.geometry.dispose(); for (const m of (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [])) { if (m.map) m.map.dispose(); m.dispose(); } });
-  mapRoot.clear(); boxes.length = 0; interiorSpots.length = 0; phongCache.clear(); FACADE.mats = []; FACADE.neon = []; FACADE.pools = []; FACADE.cache = {};
+  mapRoot.clear(); boxes.length = 0; interiorSpots.length = 0; phongCache.clear(); FACADE.mats = []; FACADE.neon = []; FACADE.pools = []; FACADE.cache = {}; CAR_MATS.length = 0;
   Object.assign(LAMP, { list: [], alive: [], flick: [], lights: [], ready: false, pools: null, halos: null, haloCol: null });
 }
 function loadMap(id) {
@@ -689,6 +689,25 @@ const boxes = []; // Kollision: {x0,x1,z0,z1,top}
 function addBox(cx, cz, w, d, top) { boxes.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, top }); }
 
 const SIDEWALK_H = 0.15;
+// Umgebungs-Reflexion fuer Autolack/Glas/Chrom (kleiner Himmel-Equirect -> PMREM), einmalig
+const CAR_MATS = []; let _carEnv;
+function carEnv() {
+  if (_carEnv !== undefined) return _carEnv;
+  try {
+    const t = canvasTex(512, 256, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#6f8fb4'); gr.addColorStop(0.42, '#d6e2ec'); gr.addColorStop(0.5, '#f4f6f6'); gr.addColorStop(0.52, '#4d4a44'); gr.addColorStop(1, '#23211e');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(255,255,255,${0.12 + (i % 4) * 0.05})`; g.beginPath(); g.ellipse((i * 97) % w, 25 + (i * 41) % 70, 30 + (i * 13) % 50, 8 + (i * 7) % 12, 0, 0, 7); g.fill(); }
+      g.fillStyle = 'rgba(255,248,225,.95)'; g.beginPath(); g.arc(w * 0.7, h * 0.18, 16, 0, 7); g.fill();
+      g.fillStyle = 'rgba(30,30,32,.55)'; for (let i = 0; i < 22; i++) g.fillRect((i * 53) % w, h * 0.5 - 6 - (i * 17) % 28, 20 + (i * 11) % 36, 40); // Haeuserzeile
+    }, false);
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    const pm = new THREE.PMREMGenerator(renderer); _carEnv = pm.fromEquirectangular(t).texture; pm.dispose();
+  } catch (e) { _carEnv = null; }
+  return _carEnv;
+}
+function carMat(o, k = 1) { const m = new THREE.MeshPhysicalMaterial(o); m.envMap = carEnv(); m.userData.k = k; m.envMapIntensity = settings.night ? 0.12 * k : k; CAR_MATS.push(m); return m; }
+function applyCarNight(n) { for (const m of CAR_MATS) m.envMapIntensity = n ? 0.12 * m.userData.k : m.userData.k; }
 let groundTex = null;
 function groundH(x, z) { for (const bx of MAP.blocks) if (Math.abs(x - bx) < 20) for (const bz of MAP.blocks) if (Math.abs(z - bz) < 20) return SIDEWALK_H; return 0; }
 function buildGround() {
@@ -1202,15 +1221,20 @@ function buildStreetProps() {
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 700; i++) { const l = (150 + rnd() * 105) | 0; g.fillStyle = `rgba(${l},${l},${l},.35)`; g.fillRect(rnd() * w, rnd() * h, rr(1, 6), rr(1, 6)); }
     for (let i = 0; i < 22; i++) { g.fillStyle = `rgba(${(120 + rnd() * 40) | 0},${(60 + rnd() * 30) | 0},30,${rr(.35, .7)})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, rr(2, 8), 0, 7); g.fill(); }
+    const dr = mkRng(99), drr = (a, b) => a + (b - a) * dr();
+    { const gd = g.createLinearGradient(0, 0, 0, h); gd.addColorStop(0, 'rgba(255,255,255,0)'); gd.addColorStop(0.6, 'rgba(0,0,0,0)'); gd.addColorStop(1, 'rgba(70,55,40,.45)'); g.fillStyle = gd; g.fillRect(0, 0, w, h); }  // Strassendreck unten
+    for (let i = 0; i < 30; i++) { g.strokeStyle = `rgba(255,255,255,${drr(.15, .4)})`; g.lineWidth = 1; const x = dr() * w, y = dr() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + drr(-18, 18), y + drr(-6, 6)); g.stroke(); }                      // Kratzer
+    for (let i = 0; i < 6; i++) { const x = dr() * w, y = dr() * h; g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.ellipse(x, y, drr(10, 26), drr(6, 14), dr() * 3, 0, 7); g.fill(); }    // ausgeblichen
+    for (let i = 0; i < 8; i++) { const x = dr() * w, y = dr() * h * .5 + h * .5; g.fillStyle = 'rgba(110,55,25,.55)'; g.beginPath(); g.arc(x, y, drr(2, 6), 0, 7); g.fill(); g.fillStyle = 'rgba(80,40,18,.35)'; g.beginPath(); g.arc(x + 2, y + 1, drr(4, 9), 0, 7); g.fill(); }  // Rost
     for (let i = 0; i < 20; i++) { g.strokeStyle = 'rgba(60,50,40,.35)'; g.lineWidth = rr(1, 2); const x = rnd() * w; g.beginPath(); g.moveTo(x, rnd() * h * .4); g.lineTo(x + rr(-3, 3), h); g.stroke(); }
   }, true);
-  const glassM = new THREE.MeshLambertMaterial({ color: 0x151b20 }), glassBroken = new THREE.MeshLambertMaterial({ color: 0x3a4650 });
-  const tireM = lambert(0x111111), hubM = lambert(0x8a8d90), blackM = lambert(0x1a1a1a), chromeM = lambert(0x9a9da0);
+  const glassM = carMat({ color: 0x10161b, metalness: 0.1, roughness: 0.05 }, 1.4), glassBroken = carMat({ color: 0x3a4650, metalness: 0.1, roughness: 0.35 });
+  const tireM = lambert(0x111111), hubM = carMat({ color: 0x9a9da0, metalness: 0.9, roughness: 0.3 }), blackM = lambert(0x1a1a1a), chromeM = carMat({ color: 0xc4c7ca, metalness: 1, roughness: 0.12 });
   const headM = new THREE.MeshBasicMaterial({ color: 0xf1e7b0 }), tailM = new THREE.MeshBasicMaterial({ color: 0x8a1212 }), plateM = lambert(0xc9c4a0);
   const burntM = lambert(0x161412), burntRoof = lambert(0x24211e);
   function makeCar() {
     const burned = rnd() < 0.15, g = new THREE.Group();
-    const body = burned ? burntM : new THREE.MeshLambertMaterial({ color: carColors[(rnd() * carColors.length) | 0], map: dirt });
+    const body = burned ? burntM : carMat({ color: carColors[(rnd() * carColors.length) | 0], map: dirt, metalness: 0.45, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.06 });
     const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
     add(carBodyG, body, 0, 0, 0);
     add(carCabG, burned ? burntRoof : (rnd() < 0.4 ? glassBroken : glassM), 0, 0, 0);
@@ -2092,6 +2116,7 @@ function applyTime() {
   stars.visible = n;
   applyLampNight(n);
   applyFacadeNight(n);
+  applyCarNight(n);
   applyBackdropNight(n);
 }
 
