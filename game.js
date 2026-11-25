@@ -844,7 +844,14 @@ function sfxTone(freq, dur, vol, type = 'sine', slide = 0, pan = 0) {
 const SFX = {
   shot(k) { const big = k === 3 ? 1 : k === 2 ? 0.8 : 0.6; sfxNoise(0.25 + big * 0.15, k === 3 ? 1400 : 3000, 0.9 * big, 'lowpass'); sfxTone(k === 3 ? 90 : 140, 0.18, 0.6 * big, 'sine', -80); },
   empty() { sfxTone(900, 0.05, 0.25, 'square'); },
-  reload(phase) { if (phase === 0) { sfxNoise(0.08, 2500, 0.4, 'bandpass', 3); sfxTone(300, 0.08, 0.2, 'square'); } else { sfxNoise(0.1, 1800, 0.5, 'bandpass', 3); sfxTone(520, 0.06, 0.25, 'square'); } },
+  // Nachlade-Bausteine (synthetisch)
+  rClick() { sfxNoise(0.025, 4200, 0.4, 'bandpass', 4); sfxTone(1800, 0.02, 0.12, 'square'); },           // Magazin-Haltung / Sicherung
+  rClack() { sfxNoise(0.06, 2400, 0.55, 'bandpass', 2); sfxTone(420, 0.06, 0.3, 'square', -200); },     // Metall auf Metall
+  rThunk() { sfxTone(150, 0.1, 0.55, 'sine', -70); sfxNoise(0.07, 700, 0.45, 'lowpass'); },            // Magazin einsetzen
+  rOut()   { sfxNoise(0.1, 1600, 0.3, 'bandpass', 1.5); sfxTone(260, 0.07, 0.15, 'triangle', -90); },  // Magazin herausziehen
+  rScrape() { sfxNoise(0.2, 3200, 0.3, 'bandpass', 1.2); },                                           // Schlitten/Verschluss zurück
+  rShell() { sfxTone(240, 0.05, 0.3, 'triangle', -80); sfxNoise(0.045, 1500, 0.35, 'bandpass', 3); }, // Patrone in Schrotflinte
+  rRustle() { sfxNoise(0.12, 1500, 0.15, 'lowpass'); },
   hit() { sfxNoise(0.1, 600, 0.5); },
   zhurt() { sfxTone(160, 0.25, 0.25, 'sawtooth', -60); },
   groan(vol, pan) { sfxTone(rr(70, 110), 0.7, 0.2 * vol, 'sawtooth', -25, pan); },
@@ -1006,7 +1013,19 @@ const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3
 function startReload() {
   const w = WEAPONS[player.weapon], a = player.ammo[player.weapon];
   if (player.reloading || a.mag >= w.mag || a.reserve <= 0 || player.dead) return;
-  player.reloading = true; player.reloadT = w.reload; SFX.reload(0); setTimeout(() => SFX.reload(1), w.reload * 650);
+  player.reloading = true; player.reloadT = w.reload; playReloadSound(player.weapon, w.reload);
+}
+// Nachladegeräusch je Waffe, passend zur Nachladedauer (wird bei Waffenwechsel abgebrochen)
+let reloadSeq = 0;
+function playReloadSound(wi, dur) {
+  const id = ++reloadSeq, S = SFX;
+  const seqs = [
+    [[0.04, S.rClick], [0.22, S.rOut], [0.3, S.rRustle], [0.55, S.rThunk], [0.62, S.rClick], [0.8, S.rScrape], [0.9, S.rClack]],                                  // Pistole
+    [[0.04, S.rClick], [0.2, S.rOut], [0.35, S.rRustle], [0.58, S.rThunk], [0.66, S.rClick], [0.78, S.rScrape], [0.88, S.rClack]],                                // MP
+    [[0.04, S.rClick], [0.18, S.rOut], [0.32, S.rRustle], [0.55, S.rThunk], [0.63, S.rClick], [0.74, S.rScrape], [0.82, S.rClack], [0.94, S.rClick]],             // Sturmgewehr
+    [[0.08, S.rClick], [0.2, S.rShell], [0.34, S.rShell], [0.48, S.rShell], [0.62, S.rShell], [0.74, S.rScrape], [0.82, S.rClack], [0.9, S.rScrape], [0.96, S.rClack]], // Schrotflinte (Patronen + Pumpen)
+  ];
+  for (const [f, fn] of seqs[wi] || seqs[0]) setTimeout(() => { if (player.reloading && reloadSeq === id) fn(); }, f * dur * 1000);
 }
 function finishReload() {
   const w = WEAPONS[player.weapon], a = player.ammo[player.weapon], n = Math.min(w.mag - a.mag, a.reserve);
