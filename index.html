@@ -27,6 +27,7 @@
     <div>ZOMBIES <b id="remaining">0</b></div>
   </div>
   <button id="btnAuto" class="btn">AUTO<br>FEUER</button>
+  <div id="fpsBox" class="hidden">0 FPS</div>
   <div id="zArrow" class="hidden"><svg id="zArrowIcon" viewBox="0 0 40 40" width="40" height="40"><path d="M20 3 L35 34 L20 26 L5 34 Z" fill="#ff4d3a" stroke="#000" stroke-width="2" stroke-linejoin="round"/></svg><span id="zDist"></span></div>
   <div id="topRight">
     <div class="label">BESIEGT</div>
@@ -79,6 +80,8 @@
       <div class="seg" id="optTime"><button data-val="false">☀ TAG</button><button data-val="true">☾ NACHT (Sterne, Taschenlampe)</button></div>
       <div class="lab">MAX. FPS</div>
       <div class="seg" id="optFps"><button data-val="30">30</button><button data-val="60">60</button><button data-val="90">90</button><button data-val="120">120</button></div>
+      <div class="lab">FPS-ANZEIGE</div>
+      <div class="seg" id="optShowFps"><button data-val="true">AN</button><button data-val="false">AUS</button></div>
       <div class="lab">AUFLÖSUNG</div>
       <div class="seg" id="optRes"><button data-val="0.75">NIEDRIG</button><button data-val="1">MITTEL</button><button data-val="1.5">HOCH</button></div>
     </div>

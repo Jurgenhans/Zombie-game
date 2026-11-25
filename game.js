@@ -1981,13 +1981,14 @@ $('btnStartBig').addEventListener('click', () => startGame('big'));
 $('btnRestart').addEventListener('click', () => startGame(mapId));
 $('btnMenu').addEventListener('click', () => { running = false; setPaused(false); $('gameOver').classList.add('hidden'); $('hud').classList.add('hidden'); $('startScreen').classList.remove('hidden'); });
 
-let last = performance.now(), lastRender = 0;
+let last = performance.now(), lastRender = 0, fpsN = 0, fpsT = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const minDt = 1000 / settings.fps, el = now - lastRender;
   if (el < minDt - 1) return;
   lastRender = now - (el % minDt);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (settings.showFps) { fpsN++; if (now - fpsT >= 500) { $('fpsBox').textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' FPS'; fpsN = 0; fpsT = now; } }
   if (running && !paused) update(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position); stars.rotation.y += dt * 0.003;
   updateEffects(dt);
@@ -2072,7 +2073,7 @@ function updateArrow() {
 
 /* ---------------- Optionen: Steuerung, Grafik, Shader ---------------- */
 const SETTINGS_KEY = 'deadcity_settings_v1';
-const settings = { sound: true, volume: 80, night: false, fps: 60, res: 1, shader: 'off', gloss: 100, sens: 100, btnScale: 100, layout: {} };
+const settings = { sound: true, volume: 80, night: false, fps: 60, showFps: false, res: 1, shader: 'off', gloss: 100, sens: 100, btnScale: 100, layout: {} };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { /* ignorieren */ }
 const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignorieren */ } };
 let paused = false, editMode = false;
@@ -2205,6 +2206,8 @@ function bindSeg(id, key, parse, onChange) {
 bindSeg('optTime', 'night', (v) => v === 'true', applyTime);
 bindSeg('optSound', 'sound', (v) => v === 'true', () => { initAudio(); applyVolume(); if (settings.sound) SFX.rClack(); });
 bindSeg('optFps', 'fps', Number, () => {});
+bindSeg('optShowFps', 'showFps', (v) => v === 'true', () => $('fpsBox').classList.toggle('hidden', !settings.showFps));
+$('fpsBox').classList.toggle('hidden', !settings.showFps);
 bindSeg('optRes', 'res', Number, applyRes);
 bindSeg('optShader', 'shader', String, applyShader);
 function bindRange(id, key, onChange) { const el = $(id); el.value = settings[key]; el.addEventListener('input', () => { settings[key] = +el.value; saveSettings(); onChange && onChange(); }); }
