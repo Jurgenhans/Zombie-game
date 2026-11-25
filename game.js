@@ -10,7 +10,8 @@ const CONFIG = {
   mapSize: 250,
   wavesEnabled: true,       // Zombie-Wellen: Welle n = 10·n Zombies (Welle 30 = alle 300 Varianten)
   maxWave: 30,
-  maxAlive: 22,             // gleichzeitig lebende Zombies (Leistung)
+  maxAlive: 9999,           // gleichzeitig lebende Zombies (bei Leistungsproblemen z.B. auf 40 setzen)
+  spawnInterval: 0.12,      // Sekunden zwischen Spawns (verteilt das Erzeugen der Zombies)
   trainingZombies: 6,       // Übungsziele solange keine Wellen aktiv sind (0 = keine)
   playerModelUrl: 'assets/models/player.glb',
   zombieModelUrls: ['assets/models/zombie.glb'], // später: weitere Zombie-Modelle hier eintragen (zufällige Auswahl)
@@ -1138,7 +1139,7 @@ const waves = {
     if (this.queue.length > 0) {
       this.spawnT -= dt;
       if (this.spawnT <= 0 && alive() < CONFIG.maxAlive) {
-        this.spawnT = Math.max(0.5, 2.0 - this.n * 0.08); const v = this.queue.pop(), p = randomSpawn(35, 90);
+        this.spawnT = CONFIG.spawnInterval; const v = this.queue.pop(), p = randomSpawn(35, 90);
         spawnZombie(p.x, p.z, { variant: v, hp: 100 + this.n * 6, speedMul: 1 + Math.min(0.6, this.n * 0.02), dmg: 10 + Math.floor(this.n / 2) }); updateHUD();
       }
     } else if (alive() === 0) {
