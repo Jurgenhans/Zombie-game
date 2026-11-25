@@ -1170,11 +1170,33 @@ function makeCanopy(x, z) {
 function buildStreetProps() {
   // ---- Autos (Profil-Extrusion, Räder, Lichter, Rost/Schmutz, Schäden)
   const carColors = [0x7a2a22, 0x2c3e55, 0x4a5a4a, 0x8a7a3a, 0x252525, 0x6a6a70, 0xb8b8b0, 0x30506a];
-  const prof = (pts) => { const s = new THREE.Shape(); pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y))); return s; };
-  const ext = (pts, depth, bev) => { const g = new THREE.ExtrudeGeometry(prof(pts), { depth, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 2, steps: 1 }); g.translate(0, 0, -depth / 2); return g; };
-  const carBodyG = ext([[-2.15, 0.32], [-2.15, 0.82], [-1.7, 0.94], [-0.9, 0.98], [1.0, 0.98], [1.7, 0.86], [2.15, 0.7], [2.15, 0.32]], 1.7, 0.05);
-  const carCabG = ext([[-1.15, 0.97], [-0.8, 1.48], [0.5, 1.48], [1.0, 0.97]], 1.55, 0.03);
-  const roofG = new THREE.BoxGeometry(1.4, 0.07, 1.62), wheelG = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 14), hubG = new THREE.CylinderGeometry(0.17, 0.17, 0.28, 8);
+  const prof = (pts, R) => { // Polygon mit abgerundeten Ecken (Radius R)
+    const s = new THREE.Shape(), n = pts.length, P = (k) => pts[(k + n) % n];
+    for (let k = 0; k < n; k++) {
+      const [px, py] = P(k), [ax, ay] = P(k - 1), [bx, by] = P(k + 1);
+      const la = Math.hypot(ax - px, ay - py), lb = Math.hypot(bx - px, by - py), r = Math.min(R, la / 2.2, lb / 2.2);
+      const sx = px + (ax - px) / la * r, sy = py + (ay - py) / la * r, ex = px + (bx - px) / lb * r, ey = py + (by - py) / lb * r;
+      if (k === 0) s.moveTo(sx, sy); else s.lineTo(sx, sy);
+      s.quadraticCurveTo(px, py, ex, ey);
+    }
+    s.closePath(); return s;
+  };
+  const smooth = (g) => { // weiche Normalen (Winkelgrenze ~50°), damit die Rundungen nicht kantig schattiert sind
+    g = g.index ? g.toNonIndexed() : g; g.computeVertexNormals();
+    const pos = g.attributes.position, nor = g.attributes.normal, map = new Map(), key = (i) => pos.getX(i).toFixed(3) + ',' + pos.getY(i).toFixed(3) + ',' + pos.getZ(i).toFixed(3);
+    for (let i = 0; i < pos.count; i++) { const k = key(i); (map.get(k) || map.set(k, []).get(k)).push(i); }
+    const out = new Float32Array(nor.array.length), cs = Math.cos(0.87);
+    for (let i = 0; i < pos.count; i++) {
+      let x = 0, y = 0, z = 0; const nx = nor.getX(i), ny = nor.getY(i), nz = nor.getZ(i);
+      for (const j of map.get(key(i))) { const mx = nor.getX(j), my = nor.getY(j), mz = nor.getZ(j); if (mx * nx + my * ny + mz * nz > cs) { x += mx; y += my; z += mz; } }
+      const l = Math.hypot(x, y, z) || 1; out[i * 3] = x / l; out[i * 3 + 1] = y / l; out[i * 3 + 2] = z / l;
+    }
+    g.setAttribute('normal', new THREE.BufferAttribute(out, 3)); return g;
+  };
+  const ext = (pts, depth, bev, R) => { const g = new THREE.ExtrudeGeometry(prof(pts, R), { depth, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 5, curveSegments: 8, steps: 1 }); g.translate(0, 0, -depth / 2); return smooth(g); };
+  const carBodyG = ext([[-2.15, 0.32], [-2.15, 0.82], [-1.7, 0.94], [-0.9, 0.98], [1.0, 0.98], [1.7, 0.86], [2.15, 0.7], [2.15, 0.32]], 1.56, 0.12, 0.3);
+  const carCabG = ext([[-1.15, 0.97], [-0.8, 1.48], [0.5, 1.48], [1.0, 0.97]], 1.41, 0.1, 0.22);
+  const roofG = new THREE.BoxGeometry(1.4, 0.07, 1.62), wheelG = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 22), hubG = new THREE.CylinderGeometry(0.17, 0.17, 0.28, 8);
   wheelG.rotateX(Math.PI / 2); hubG.rotateX(Math.PI / 2);
   const dirt = canvasTex(128, 128, (g, w, h) => {
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
