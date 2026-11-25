@@ -679,6 +679,53 @@ function buildCity() {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, 5, d), wallMat); m.position.set(x, 2.5, z); mapRoot.add(m); addBox(x, z, w, d, 50);
   });
   buildStreetProps();
+  scatterTrash();
+}
+
+/* ---- Müll: Pappbecher, Dosen, Flaschen, Tüten, Papier, Pappe, Fast-Food-Boxen – nur Optik, KEINE Kollision (man läuft einfach drüber) ---- */
+function scatterTrash() {
+  const r = mkRng(4711 + MAP.size), AF = (MAP.size / 250) ** 2, T = {};
+  const bag = new THREE.IcosahedronGeometry(1, 1); { const p = bag.attributes.position, jr = mkRng(5), seen = new Map(); for (let i = 0; i < p.count; i++) { const k = p.getX(i).toFixed(2) + p.getY(i).toFixed(2) + p.getZ(i).toFixed(2); if (!seen.has(k)) seen.set(k, [0.75 + jr() * 0.5, jr() - 0.5]); const j = seen.get(k); p.setXYZ(i, p.getX(i) * j[0], p.getY(i) * (0.7 + j[1] * 0.8), p.getZ(i) * j[0]); } bag.computeVertexNormals(); }
+  const defs = {
+    cup:   { w: 0.22, geo: new THREE.CylinderGeometry(0.042, 0.03, 0.11, 8), cols: [0xf2f2ee, 0xf2f2ee, 0xb83232, 0x8a5a36, 0xe8d8b0] },
+    can:   { w: 0.18, geo: new THREE.CylinderGeometry(0.033, 0.033, 0.12, 8), cols: [0xc83030, 0xaab0b4, 0x2f5fa8, 0x3a8a4a, 0xd8a020] },
+    bottle:{ w: 0.12, geo: new THREE.CylinderGeometry(0.04, 0.04, 0.22, 8), cols: [0x9ec8e0, 0xcfe4ea, 0x6aa86a, 0xd8e8f0] },
+    bag:   { w: 0.14, geo: bag, cols: [0xe8e8e0, 0xcfd3d6, 0x5a6b8a, 0x222222, 0xb04040, 0xd8c8a0] },
+    ball:  { w: 0.14, geo: new THREE.IcosahedronGeometry(0.06, 0), cols: [0xe6e2d4, 0xd8d0b0, 0xcfd2d6] },
+    sheet: { w: 0.12, geo: new THREE.BoxGeometry(0.3, 0.004, 0.21), cols: [0xdedbd0, 0xc9c6b8, 0xd8c9a0, 0xb8c0c8] },
+    card:  { w: 0.05, geo: new THREE.BoxGeometry(0.5, 0.025, 0.36), cols: [0x9c7a4c, 0x8a6a40, 0xa88a58] },
+    food:  { w: 0.03, geo: new THREE.BoxGeometry(0.17, 0.06, 0.17), cols: [0xc83030, 0xe8c030, 0xeeeeee] },
+  };
+  const keys = Object.keys(defs); for (const k of keys) T[k] = [];
+  const blocked = (x, z) => boxes.some((b) => !b.y0 && b.top > 0.3 && x > b.x0 - 0.15 && x < b.x1 + 0.15 && z > b.z0 - 0.15 && z < b.z1 + 0.15);
+  const pickType = () => { let t = r(), acc = 0; for (const k of keys) { acc += defs[k].w; if (t < acc) return k; } return 'cup'; };
+  const place = (cx, cz, n, spread, fy) => {
+    for (let i = 0; i < n; i++) {
+      const x = cx + (r() + r() + r() - 1.5) * spread, z = cz + (r() + r() + r() - 1.5) * spread;
+      if (Math.abs(x) > HALF - 1 || Math.abs(z) > HALF - 1 || blocked(x, z)) continue;
+      const k = pickType(), c = defs[k].cols[(r() * defs[k].cols.length) | 0], yaw = r() * 6.283, s = 0.85 + r() * 0.4;
+      let y = 0, rx = 0, rz = 0, sx = 1, sy = 1, sz = 1;
+      if (k === 'cup') { if (r() < 0.7) { rz = Math.PI / 2; y = 0.042; } else { y = 0.055; rx = (r() - 0.5) * 0.3; } }
+      else if (k === 'can') { if (r() < 0.8) { rz = Math.PI / 2; y = 0.033; } else y = 0.06; }
+      else if (k === 'bottle') { rz = Math.PI / 2; y = 0.04; }
+      else if (k === 'bag') { sx = 0.22 * s * (1 + r()); sy = 0.05 + r() * 0.04; sz = 0.18 * s * (1 + r() * 0.8); y = sy * 0.5; }
+      else if (k === 'ball') { sx = sy = sz = s; y = 0.05 * s; }
+      else if (k === 'sheet') { y = 0.008; rx = (r() - 0.5) * 0.06; }
+      else if (k === 'card') { y = 0.02; sx = s; sz = s; }
+      else { y = 0.032; }
+      T[k].push({ x, y: y + fy, z, rx, ry: yaw, rz, sx, sy, sz, c });
+    }
+  };
+  const nCl = Math.round(95 * AF) + 4;
+  for (let i = 0; i < nCl; i++) { const x = (r() - 0.5) * 2 * (MAP.edge - 3), z = (r() - 0.5) * 2 * (MAP.edge - 3); place(x, z, 3 + ((r() * 7) | 0), 1.2, 0); }
+  for (const sp of interiorSpots) for (let i = 0; i < 2; i++) place(sp.x + (r() - 0.5) * 6, sp.z + (r() - 0.5) * 6, 4 + ((r() * 4) | 0), 1.4, 0.04); // auch in den Häusern
+  const d = new THREE.Object3D(), col = new THREE.Color();
+  for (const k of keys) {
+    const list = T[k]; if (!list.length) continue;
+    const im = new THREE.InstancedMesh(defs[k].geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), list.length);
+    list.forEach((o, i) => { d.position.set(o.x, o.y, o.z); d.rotation.set(o.rx, o.ry, o.rz); d.scale.set(o.sx, o.sy, o.sz); d.updateMatrix(); im.setMatrixAt(i, d.matrix); im.setColorAt(i, col.setHex(o.c)); });
+    im.frustumCulled = false; mapRoot.add(im);
+  }
 }
 
 function addTree(x, z) {
