@@ -1466,21 +1466,63 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: tru
 const flash = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.25), flashMat); flash.visible = false;
 const flashLight = new THREE.PointLight(0xffc070, 0, 12); flashLight.visible = true; camera.add(flashLight); flashLight.position.set(0.2, -0.1, -0.8);
 function buildViewGuns() {
+  const metal = lambert(0x74777c), black = lambert(0x141416), wood = lambert(0x6a4a2c), red = new THREE.MeshBasicMaterial({ color: 0xff2a1a }), brass = lambert(0xb08a3a), cuff = lambert(0x24262a);
   WEAPONS.forEach((w, i) => {
-    const g = new THREE.Group(); const mm = lambert(w.color), dark = lambert(0x151515);
-    const bx = (sx, sy, sz, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m || mm); b.position.set(x, y, z); g.add(b); return b; };
-    bx(0.06, 0.1, w.len, 0, 0, -w.len / 2);                    // Körper
-    bx(0.04, 0.04, w.len * 0.6, 0, 0.035, -w.len - w.len * 0.2, dark); // Lauf
-    bx(0.05, 0.14, 0.06, 0, -0.11, -0.05, dark);               // Griff
-    if (i === 2) { bx(0.05, 0.14, 0.06, 0, -0.1, -0.35, dark); bx(0.03, 0.04, 0.2, 0, 0.08, -0.3, dark); }
-    if (i === 1) bx(0.04, 0.16, 0.05, 0, -0.12, -0.22, dark);
-    if (i === 3) bx(0.07, 0.07, 0.25, 0, -0.04, -0.45, lambert(0x5a432c));
-    // Arme/Hände
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.45), sleeve); arm.position.set(0.09, -0.12, 0.2); arm.rotation.set(0.1, -0.15, 0); g.add(arm);
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.075, 0.12), handSkin); hand.position.set(0.04, -0.1, -0.04); g.add(hand);
-    const arm2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.5), sleeve); arm2.position.set(-0.15, -0.14, -0.1); arm2.rotation.set(0.12, 0.35, 0); g.add(arm2);
-    const hand2 = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.075, 0.1), handSkin); hand2.position.set(-0.04, -0.075, -w.len * 0.55); g.add(hand2);
-    g.visible = false; g.muzzle = new THREE.Vector3(0, 0.02, -w.len * 1.45); view.add(g); viewGuns.push(g);
+    const g = new THREE.Group(), mm = lambert(w.color);
+    const bx = (sx, sy, sz, x, y, z, m, rx = 0) => { const b = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m || mm); b.position.set(x, y, z); b.rotation.x = rx; g.add(b); return b; };
+    const cy = (r, l, x, y, z, m, seg = 12) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, l, seg).rotateX(Math.PI / 2), m || black); c.position.set(x, y, z); g.add(c); return c; };
+    const limb = (a, b, r0, r1, m) => { // Zylinder von a nach b
+      const d = new THREE.Vector3().subVectors(b, a), l = d.length(), c = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, l, 10), m);
+      c.position.copy(a).addScaledVector(d, 0.5); c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); g.add(c); return c;
+    };
+    const hand = (x, y, z, side) => { // Hand mit Fingern um den Griff + Daumen
+      const h = new THREE.Group(); h.position.set(x, y, z);
+      const add = (sx, sy, sz, px, py, pz, rx = 0) => { const b = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), handSkin); b.position.set(px, py, pz); b.rotation.x = rx; h.add(b); };
+      add(0.062, 0.05, 0.075, 0, 0, 0.01);                                      // Handballen/Rücken
+      for (let k = 0; k < 4; k++) add(0.013, 0.02, 0.05, side * (-0.021 + k * 0.014) * -1, -0.03, -0.012, 0.25); // Finger
+      add(0.018, 0.018, 0.05, -side * 0.034, 0.012, -0.03, -0.3);                // Daumen
+      g.add(h); return h;
+    };
+    // --- Waffen
+    let muz, rh, lh; // muz = Mündung, rh/lh = Handposition rechts/links
+    if (i === 0) { // Pistole
+      bx(0.045, 0.038, 0.23, 0, -0.012, -0.12); bx(0.05, 0.04, 0.27, 0, 0.026, -0.135, metal);
+      for (let k = 0; k < 5; k++) bx(0.054, 0.034, 0.008, 0, 0.026, -0.03 - k * 0.014, black);        // Rillen
+      cy(0.011, 0.03, 0, 0.026, -0.28); bx(0.008, 0.014, 0.01, 0, 0.052, -0.26, black); bx(0.03, 0.012, 0.01, 0, 0.052, -0.012, black);
+      bx(0.042, 0.13, 0.055, 0, -0.095, -0.03, black, -0.22);                                          // Griff
+      bx(0.01, 0.012, 0.075, 0, -0.04, -0.11, black); bx(0.01, 0.03, 0.01, 0, -0.03, -0.145, black); bx(0.012, 0.025, 0.012, 0, -0.03, -0.095, metal, 0.3); // Abzugsbügel/Abzug
+      muz = -0.3; rh = [0.022, -0.085, -0.03]; lh = [-0.03, -0.095, -0.022];
+    } else if (i === 1) { // MP
+      bx(0.06, 0.07, 0.34, 0, 0, -0.18); bx(0.03, 0.012, 0.3, 0, 0.041, -0.2, black);
+      bx(0.034, 0.03, 0.045, 0, 0.066, -0.17, black); bx(0.022, 0.02, 0.005, 0, 0.068, -0.195, red);       // Rotpunkt
+      cy(0.026, 0.2, 0, 0.005, -0.44, mm); for (let k = 0; k < 4; k++) cy(0.0275, 0.012, 0, 0.005, -0.37 - k * 0.04, black);
+      cy(0.011, 0.1, 0, 0.005, -0.59, black);
+      bx(0.034, 0.17, 0.05, 0, -0.12, -0.24, black, 0.12); bx(0.045, 0.12, 0.055, 0, -0.09, -0.05, black, -0.25); bx(0.04, 0.09, 0.04, 0, -0.07, -0.41, black);
+      bx(0.012, 0.012, 0.2, 0.022, 0.0, 0.1, metal); bx(0.012, 0.012, 0.2, -0.022, 0.0, 0.1, metal); bx(0.056, 0.075, 0.02, 0, 0, 0.2, black); // Drahtschulterstütze
+      muz = -0.66; rh = [0.022, -0.085, -0.05]; lh = [0, -0.1, -0.41];
+    } else if (i === 2) { // Sturmgewehr
+      bx(0.06, 0.085, 0.3, 0, 0, -0.15); bx(0.072, 0.07, 0.3, 0, -0.005, -0.45); bx(0.03, 0.012, 0.58, 0, 0.044, -0.3, black);
+      for (let k = 0; k < 5; k++) bx(0.076, 0.012, 0.014, 0, 0.0, -0.34 - k * 0.055, black);              // Lüftungsschlitze
+      cy(0.011, 0.3, 0, 0.012, -0.75); cy(0.017, 0.07, 0, 0.012, -0.93); bx(0.008, 0.04, 0.008, 0, 0.068, -0.8, black); bx(0.04, 0.025, 0.01, 0, 0.062, -0.05, black);
+      cy(0.022, 0.11, 0, 0.078, -0.22, black); cy(0.0235, 0.004, 0, 0.078, -0.275, red);                   // Visier
+      bx(0.04, 0.1, 0.06, 0, -0.12, -0.27, black, 0.1); bx(0.04, 0.08, 0.06, 0, -0.205, -0.295, black, 0.35); // gebogenes Magazin
+      bx(0.045, 0.12, 0.05, 0, -0.1, -0.05, black, -0.3); bx(0.045, 0.09, 0.25, 0, -0.015, 0.14, black);
+      bx(0.05, 0.1, 0.02, 0, -0.015, 0.275, metal);
+      muz = -0.97; rh = [0.022, -0.09, -0.055]; lh = [0, -0.07, -0.46];
+    } else { // Schrotflinte
+      bx(0.065, 0.09, 0.28, 0, 0, -0.1); cy(0.017, 0.62, 0, 0.026, -0.6); cy(0.014, 0.5, 0, -0.03, -0.54, metal); cy(0.02, 0.03, 0, -0.03, -0.8);
+      bx(0.062, 0.05, 0.2, 0, -0.035, -0.46, wood); for (let k = 0; k < 4; k++) bx(0.066, 0.01, 0.008, 0, -0.035, -0.39 - k * 0.04, black);
+      bx(0.008, 0.012, 0.008, 0, 0.049, -0.9, black); bx(0.05, 0.11, 0.32, 0, -0.03, 0.2, wood, 0.12); bx(0.046, 0.1, 0.05, 0, -0.095, -0.02, wood, -0.25);
+      cy(0.01, 0.04, 0.034, 0.005, -0.08, red); cy(0.01, 0.012, 0.034, 0.005, -0.1, brass); cy(0.01, 0.04, 0.034, 0.005, -0.15, red);
+      muz = -0.92; rh = [0.022, -0.09, -0.02]; lh = [0, -0.075, -0.46];
+    }
+    // --- Arme + Hände (Ärmel bis zum Handgelenk, Manschette)
+    const R = hand(rh[0], rh[1], rh[2], 1), L = hand(lh[0], lh[1], lh[2], -1);
+    const wr = (h, sx) => new THREE.Vector3(h.position.x + sx * 0.012, h.position.y - 0.012, h.position.z + 0.05);
+    const rw = wr(R, 1), lw = wr(L, -1);
+    limb(new THREE.Vector3(0.2, -0.32, 0.5), rw, 0.052, 0.04, sleeve); limb(rw.clone().add(new THREE.Vector3(0.004, 0.0, 0.03)), rw, 0.046, 0.041, cuff);
+    limb(new THREE.Vector3(-0.24, -0.32, 0.5), lw, 0.052, 0.04, sleeve); limb(lw.clone().add(new THREE.Vector3(-0.004, 0.0, 0.03)), lw, 0.046, 0.041, cuff);
+    g.visible = false; g.muzzle = new THREE.Vector3(0, 0.02, muz); view.add(g); viewGuns.push(g);
   });
   view.position.set(0.2, -0.22, -0.4); view.add(flash);
 }
