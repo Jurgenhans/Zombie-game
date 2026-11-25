@@ -1214,7 +1214,12 @@ function buildStreetProps() {
   };
   const ext = (pts, depth, bev, R) => { const g = new THREE.ExtrudeGeometry(prof(pts, R), { depth, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 5, curveSegments: 8, steps: 1 }); g.translate(0, 0, -depth / 2); return smooth(g); };
   const carBodyG = ext([[-2.15, 0.32], [-2.15, 0.82], [-1.7, 0.94], [-0.9, 0.98], [1.0, 0.98], [1.7, 0.86], [2.15, 0.7], [2.15, 0.32]], 1.56, 0.12, 0.3);
-  const carCabG = ext([[-1.15, 0.97], [-0.8, 1.48], [0.5, 1.48], [1.0, 0.97]], 1.41, 0.1, 0.22);
+  const roofSplit = (g) => { // Dachflaeche (Normale zeigt nach oben) -> Gruppe 1 (Lack), Rest -> Gruppe 0 (Glas)
+    const pos = g.attributes.position, nor = g.attributes.normal, glass = [], paint = [];
+    for (let t = 0; t < pos.count; t += 3) { const ny = (nor.getY(t) + nor.getY(t + 1) + nor.getY(t + 2)) / 3; (ny > 0.8 ? paint : glass).push(t, t + 1, t + 2); }
+    g.setIndex(glass.concat(paint)); g.clearGroups(); g.addGroup(0, glass.length, 0); g.addGroup(glass.length, paint.length, 1); return g;
+  };
+  const carCabG = roofSplit(ext([[-1.15, 0.97], [-0.8, 1.48], [0.5, 1.48], [1.0, 0.97]], 1.41, 0.1, 0.22));
   const roofG = new THREE.BoxGeometry(1.4, 0.07, 1.62), wheelG = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 22), hubG = new THREE.CylinderGeometry(0.17, 0.17, 0.28, 8);
   wheelG.rotateX(Math.PI / 2); hubG.rotateX(Math.PI / 2);
   const dirt = canvasTex(128, 128, (g, w, h) => {
@@ -1237,8 +1242,7 @@ function buildStreetProps() {
     const body = burned ? burntM : carMat({ color: carColors[(rnd() * carColors.length) | 0], map: dirt, metalness: 0.45, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.06 });
     const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
     add(carBodyG, body, 0, 0, 0);
-    add(carCabG, burned ? burntRoof : (rnd() < 0.4 ? glassBroken : glassM), 0, 0, 0);
-    add(roofG, burned ? burntRoof : body, -0.15, 1.51, 0);
+    add(carCabG, burned ? [burntRoof, burntRoof] : [rnd() < 0.4 ? glassBroken : glassM, body], 0, 0, 0); // Scheiben + lackiertes Dach
     const bx = (sx, sy, sz, m, x, y, z) => add(new THREE.BoxGeometry(sx, sy, sz), m, x, y, z);
     bx(0.14, 0.2, 1.8, blackM, 2.2, 0.42, 0); bx(0.14, 0.2, 1.8, blackM, -2.2, 0.42, 0);       // Stoßfänger
     bx(0.05, 0.18, 0.9, blackM, 2.2, 0.68, 0);                                              // Kühlergrill
