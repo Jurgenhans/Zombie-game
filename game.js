@@ -981,6 +981,16 @@ function buildCity() {
     mapRoot.add(g); addBox(x, z, s, s, s);
   };
 
+  // Bordstein: 3D-Absatz (0,15 m) am Rand jedes Blocks zur Straße (Spieler steigt automatisch hinauf)
+  const curbMat = lambert(0xaaa89f), CH = 0.15, CT = 0.25;
+  const curb = (x0, x1, z0, z1) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, CH, z1 - z0), curbMat); m.position.set((x0 + x1) / 2, CH / 2, (z0 + z1) / 2); mapRoot.add(m);
+    boxes.push({ x0, x1, z0, z1, top: CH });
+  };
+  for (const bx of MAP.blocks) for (const bz of MAP.blocks) {
+    curb(bx - 20, bx + 20, bz - 20, bz - 20 + CT); curb(bx - 20, bx + 20, bz + 20 - CT, bz + 20);
+    curb(bx - 20, bx - 20 + CT, bz - 20 + CT, bz + 20 - CT); curb(bx + 20 - CT, bx + 20, bz - 20 + CT, bz + 20 - CT);
+  }
   for (const bx of MAP.blocks) for (const bz of MAP.blocks) {
     for (let ix = 0; ix < 2; ix++) for (let iz = 0; iz < 2; iz++) {
       const cx = bx + (ix ? 10 : -10), cz = bz + (iz ? 10 : -10);
