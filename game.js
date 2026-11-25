@@ -688,7 +688,44 @@ function addTree(x, z) {
     const b = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.07, 1.8, 4), lambert(0x3a2e24));
     b.position.set(0.5 * Math.cos(i * 1.6), 3.2 + i * 0.2, 0.5 * Math.sin(i * 1.6)); b.rotation.set(Math.sin(i * 1.6) * .9, 0, -Math.cos(i * 1.6) * .9); g.add(b);
   }
+  g.add(makeCanopy(x, z));
+  const pile = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), leafPileMat()); pile.rotation.x = -Math.PI / 2; pile.rotation.z = (hashXZ(x, z) % 628) / 100; pile.position.y = 0.035; g.add(pile); // Laub am Boden
   g.position.set(x, 0, z); mapRoot.add(g); addBox(x, z, 0.5, 0.5, 5);
+}
+
+/* ---- Herbstlaub: braune/rostige Krone aus unregelmäßigen Low-Poly-Blöcken (1 Mesh pro Baum, Vertexfarben) ---- */
+const LEAF_COLORS = [0x6b3e1c, 0x7a4a22, 0x8b5a2b, 0x9a6a30, 0xa0522d, 0x7c3f1a, 0xb07a38, 0x5a3418];
+let _leafMat = null, _leafPileMat = null;
+function leafPileMat() {
+  if (!_leafPileMat) _leafPileMat = new THREE.MeshLambertMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, map: canvasTex(256, 256, (g, w) => {
+    const r = mkRng(777);
+    for (let i = 0; i < 900; i++) { // Blätter, nach außen dünner werdend
+      const a = r() * 6.283, d = Math.pow(r(), 0.7) * w * 0.48, c = LEAF_COLORS[(r() * LEAF_COLORS.length) | 0];
+      g.save(); g.translate(w / 2 + Math.cos(a) * d, w / 2 + Math.sin(a) * d); g.rotate(r() * 6.283); g.fillStyle = '#' + c.toString(16).padStart(6, '0'); g.globalAlpha = 0.9 - d / (w * 0.55);
+      g.beginPath(); g.ellipse(0, 0, 2 + r() * 3, 1.2 + r() * 1.6, 0, 0, 7); g.fill(); g.restore();
+    }
+  }, false) });
+  return _leafPileMat;
+}
+function makeCanopy(x, z) {
+  const r = mkRng(hashXZ(x, z) + 91), pos = [], col = [];
+  const blobs = 6 + ((r() * 3) | 0), tone = LEAF_COLORS[(r() * LEAF_COLORS.length) | 0];
+  for (let b = 0; b < blobs; b++) {
+    const geo = new THREE.IcosahedronGeometry(0.9 + r() * 0.7, 1), p = geo.attributes.position, a = r() * 6.283, d = b ? 0.8 + r() * 1.3 : 0;
+    const ox = Math.cos(a) * d, oy = 4.5 + (b ? r() * 1.4 - 0.2 : 0.9), oz = Math.sin(a) * d;
+    const jit = new Map(), c = new THREE.Color(r() < 0.5 ? tone : LEAF_COLORS[(r() * LEAF_COLORS.length) | 0]);
+    for (let i = 0; i < p.count; i++) { // gleiche Eckpunkte gleich verschieben, damit keine Löcher entstehen
+      const k = p.getX(i).toFixed(3) + ',' + p.getY(i).toFixed(3) + ',' + p.getZ(i).toFixed(3);
+      if (!jit.has(k)) jit.set(k, [(r() - 0.5) * 0.45, (r() - 0.5) * 0.35, (r() - 0.5) * 0.45]);
+      const j = jit.get(k); pos.push(p.getX(i) + j[0] + ox, p.getY(i) * 0.8 + j[1] + oy, p.getZ(i) + j[2] + oz);
+    }
+    for (let f = 0; f < p.count / 3; f++) { const v = 0.82 + r() * 0.3; for (let q = 0; q < 3; q++) col.push(c.r * v, c.g * v, c.b * v); } // pro Fläche leicht andere Helligkeit
+    geo.dispose();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+  if (!_leafMat) _leafMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  return new THREE.Mesh(g, _leafMat);
 }
 
 function buildStreetProps() {
@@ -1497,7 +1534,7 @@ const SHADERS = {
 const phongCache = new Map();
 function phongOf(m) {
   let p = phongCache.get(m);
-  if (!p) { p = new THREE.MeshPhongMaterial({ color: m.color, map: m.map, alphaTest: m.alphaTest, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits }); p.userData.orig = m; phongCache.set(m, p); }
+  if (!p) { p = new THREE.MeshPhongMaterial({ color: m.color, map: m.map, alphaTest: m.alphaTest, vertexColors: m.vertexColors, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits }); p.userData.orig = m; phongCache.set(m, p); }
   return p;
 }
 function applyShaderTo(root) {
