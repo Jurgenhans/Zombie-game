@@ -688,6 +688,9 @@ function loadMap(id) {
 const boxes = []; // Kollision: {x0,x1,z0,z1,top}
 function addBox(cx, cz, w, d, top) { boxes.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, top }); }
 
+const SIDEWALK_H = 0.15;
+let groundTex = null;
+function groundH(x, z) { for (const bx of MAP.blocks) if (Math.abs(x - bx) < 20) for (const bz of MAP.blocks) if (Math.abs(z - bz) < 20) return SIDEWALK_H; return 0; }
 function buildGround() {
   const SIZE = Math.min(3072, renderer.capabilities.maxTextureSize || 2048);
   const aniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4;
@@ -752,7 +755,7 @@ function buildGround() {
     for (let i = 0; i < d.length; i += 4) { s = (s * 1103515245 + 12345) & 0x7fffffff; const n = ((s >> 16) & 31) - 15; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
     g.putImageData(id, 0, 0);
   }, false);
-  tex.anisotropy = aniso;
+  tex.anisotropy = aniso; groundTex = tex;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(MAP.size, MAP.size), new THREE.MeshLambertMaterial({ map: tex }));
   m.rotation.x = -Math.PI / 2; mapRoot.add(m);
   // Detail-Textur (gekachelt) für Schärfe im Nahbereich
@@ -981,16 +984,15 @@ function buildCity() {
     mapRoot.add(g); addBox(x, z, s, s, s);
   };
 
-  // Bordstein: 3D-Absatz (0,15 m) am Rand jedes Blocks zur Straße (Spieler steigt automatisch hinauf)
-  const curbMat = lambert(0xaaa89f), CH = 0.15, CT = 0.25;
-  const curb = (x0, x1, z0, z1) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, CH, z1 - z0), curbMat); m.position.set((x0 + x1) / 2, CH / 2, (z0 + z1) / 2); mapRoot.add(m);
-    boxes.push({ x0, x1, z0, z1, top: CH });
-  };
+  // Bordstein: jeder Block (Gehweg + Grundstück) ist eine 15 cm hohe Platte; Spieler/Zombies steigen automatisch hinauf
+  const curbMat = lambert(0xaaa89f), CH = SIDEWALK_H;
   for (const bx of MAP.blocks) for (const bz of MAP.blocks) {
-    curb(bx - 20, bx + 20, bz - 20, bz - 20 + CT); curb(bx - 20, bx + 20, bz + 20 - CT, bz + 20);
-    curb(bx - 20, bx - 20 + CT, bz - 20 + CT, bz + 20 - CT); curb(bx + 20 - CT, bx + 20, bz - 20 + CT, bz + 20 - CT);
+    const t = groundTex.clone(); t.repeat.set(40 / MAP.size, 40 / MAP.size); t.offset.set((bx - 20 + HALF) / MAP.size, 1 - (bz + 20 + HALF) / MAP.size); t.needsUpdate = true;
+    const top = new THREE.MeshLambertMaterial({ map: t });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(40, CH, 40), [curbMat, curbMat, top, curbMat, curbMat, curbMat]); m.position.set(bx, CH / 2, bz); mapRoot.add(m);
+    boxes.push({ x0: bx - 20, x1: bx + 20, z0: bz - 20, z1: bz + 20, top: CH });
   }
+  const liftN = mapRoot.children.length, liftB = boxes.length;
   for (const bx of MAP.blocks) for (const bz of MAP.blocks) {
     for (let ix = 0; ix < 2; ix++) for (let iz = 0; iz < 2; iz++) {
       const cx = bx + (ix ? 10 : -10), cz = bz + (iz ? 10 : -10);
@@ -1004,6 +1006,10 @@ function buildCity() {
         addTree(cx + rr(-6, 6), cz + rr(-6, 6));
       }
     }
+  }
+  { // alles auf den Blöcken (Häuser, Bäume, Kisten) auf die Platte setzen
+    const lift = new THREE.Group(); lift.position.y = CH; lift.add(...mapRoot.children.slice(liftN)); mapRoot.add(lift);
+    for (let k = liftB; k < boxes.length; k++) { const b = boxes[k]; b.top += CH; if (b.y0) b.y0 += CH; }
   }
   // Außenrand: ein paar Ruinen & Bäume
   for (let i = 0; i < MAP.ring; i++) {
@@ -1036,6 +1042,7 @@ function scatterTrash() {
   const keys = Object.keys(defs); for (const k of keys) T[k] = [];
   const blocked = (x, z) => boxes.some((b) => !b.y0 && b.top > 0.3 && x > b.x0 - 0.15 && x < b.x1 + 0.15 && z > b.z0 - 0.15 && z < b.z1 + 0.15);
   const pickType = () => { let t = r(), acc = 0; for (const k of keys) { acc += defs[k].w; if (t < acc) return k; } return 'cup'; };
+  const blockedH = groundH;
   const place = (cx, cz, n, spread, fy) => {
     for (let i = 0; i < n; i++) {
       const x = cx + (r() + r() + r() - 1.5) * spread, z = cz + (r() + r() + r() - 1.5) * spread;
@@ -1050,7 +1057,7 @@ function scatterTrash() {
       else if (k === 'sheet') { y = 0.008; rx = (r() - 0.5) * 0.06; }
       else if (k === 'card') { y = 0.02; sx = s; sz = s; }
       else { y = 0.032; }
-      T[k].push({ x, y: y + fy, z, rx, ry: yaw, rz, sx, sy, sz, c });
+      T[k].push({ x, y: y + fy + (blockedH(x, z)), z, rx, ry: yaw, rz, sx, sy, sz, c });
     }
   };
   const nCl = Math.round(95 * AF) + 4;
@@ -1190,7 +1197,7 @@ function buildStreetProps() {
     const x = rr(-(MAP.edge - 5), MAP.edge - 5), z = rr(-(MAP.edge - 5), MAP.edge - 5);
     if (Math.abs(x) < 6 && Math.abs(z) < 6) continue;
     if (boxes.some((b) => x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5)) continue;
-    const m = makeBarrel([0x7a2f20, 0x3a5a3a, 0x2f4a6a][i % 3]); m.position.set(x, 0.45, z); m.rotation.y = (hashXZ(x, z) % 628) / 100; mapRoot.add(m); addBox(x, z, 0.6, 0.6, 0.9);
+    const m = makeBarrel([0x7a2f20, 0x3a5a3a, 0x2f4a6a][i % 3]); m.position.set(x, 0.45 + groundH(x, z), z); m.rotation.y = (hashXZ(x, z) % 628) / 100; mapRoot.add(m); addBox(x, z, 0.6, 0.6, 0.9 + groundH(x, z));
   }
   finalizeLamps(); // Laternen: Lichtpfützen, Glow, Lichter
 }
@@ -1699,7 +1706,7 @@ function updateZombie(z, dt) {
   resolveCircle(z.pos, 0.38, 0, 0.3);
   // Hängen geblieben? -> seitlich ausweichen
   z.stuckT += dt; if (z.stuckT > 0.5) { if (z.state === 'chase' && z.pos.distanceTo(z.lastP) < spd * 0.5 * 0.3) { z.side = (rnd() < 0.5 ? 1 : -1) * rr(1.0, 1.7); z.sideT = rr(0.8, 1.6); } z.lastP.copy(z.pos); z.stuckT = 0; }
-  z.root.position.set(z.pos.x, z.pos.y, z.pos.z); z.root.rotation.set(0, z.yaw, 0);
+  z.pos.y = groundH(z.pos.x, z.pos.z); z.root.position.set(z.pos.x, z.pos.y, z.pos.z); z.root.rotation.set(0, z.yaw, 0);
   // Animation
   const sw = Math.sin(z.phase), amp = z.state === 'attack' ? 0.1 : (z.runner ? 0.9 : 0.55);
   if (z.parts) {
