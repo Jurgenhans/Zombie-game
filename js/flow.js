@@ -13,7 +13,7 @@ import { setPaused } from './options.js';
 import { _o, rayBox, raySphere, resolveCircle, supportY } from './physics.js';
 import { spawnPickups, updatePickups } from './pickups.js';
 import { S, player } from './state.js';
-import { _d, finishReload, flash, flashLight, selectWeapon, shoot, view, viewGuns } from './weapons.js';
+import { _d, animateGun, finishReload, flash, flashLight, selectWeapon, shoot, view, viewGuns } from './weapons.js';
 import { loadMap } from './world.js';
 import { alive, randomSpawn, spawnZombie, updateAudible, updateZombie, waves, zombies } from './zombies.js';
 
@@ -94,6 +94,7 @@ export function update(dt) {
   const sw = player.swapT > 0 ? player.swapT / 0.25 : 0;
   view.position.set(0.2 + Math.sin(player.bob) * 0.012, -0.22 + Math.abs(Math.cos(player.bob)) * 0.01 - rl * 0.25 - sw * 0.3, -0.4 + player.recoilKick * 0.05);
   view.rotation.set(player.recoilKick * 0.05 + rl * 0.6, 0, rl * -0.2);
+  animateGun(dt);
   if (player.flashT > 0) { player.flashT -= dt; if (player.flashT <= 0) { flash.visible = false; flashLight.intensity = 0; } }
   // Zombies
   updateAudible(dt);

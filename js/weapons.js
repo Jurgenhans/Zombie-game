@@ -44,11 +44,42 @@ export function buildViewGuns() {
     const rw = wr(R, 1), lw = wr(L, -1);
     limb(new THREE.Vector3(0.2, -0.34, 0.5), rw, 0.056, 0.042, jacket); limb(rw.clone().add(new THREE.Vector3(0.003, 0.0, 0.025)), rw, 0.05, 0.044, cuff);
     limb(new THREE.Vector3(-0.24, -0.34, 0.5), lw, 0.056, 0.042, jacket); limb(lw.clone().add(new THREE.Vector3(-0.003, 0.0, 0.025)), lw, 0.05, 0.044, cuff);
+    g.parts = B.parts; g.L = L; g.Lrest = B.lh; g.Lmag = B.lhMag; g.S = B.S; // fuer die Animation
     g.visible = false; g.muzzle = new THREE.Vector3(VOFF[i][0], 0.02 + VOFF[i][1], B.muzzle - VOFF[i][2]); view.add(g); viewGuns.push(g);
   });
   view.position.set(0.2, -0.22, -0.4); view.add(flash);
 }
 buildViewGuns();
+/* Waffen-Animation (nur Transformationen bestehender Teile, keine Allokation):
+   Rueckstoss von Schlitten/Verschluss/Pumpe beim Schuss, Magazinwechsel mit Linkshand beim Nachladen. */
+let slideT = 0, pumpT = 0;
+const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+export function animateGun(dt) {
+  const g = viewGuns[player.weapon]; if (!g || !g.parts) return;
+  const P = g.parts, S = g.S, w = WEAPONS[player.weapon];
+  if (slideT > 0) slideT = Math.max(0, slideT - dt / Math.min(0.12, w.rate * 0.9));
+  if (pumpT > 0) pumpT = Math.max(0, pumpT - dt);
+  const k = Math.sin(Math.min(1, 1 - slideT) * Math.PI) * (slideT > 0 ? 1 : 0); // 0 -> 1 -> 0 ueber die Rueckstosszeit
+  if (P.slide) P.slide.position.z = k * 0.032;                    // Pistole: Schlitten faehrt zurueck
+  if (P.bolt) P.bolt.position.z = k * 0.045;                      // MP/Gewehr: Verschluss + Ladehebel
+  let p = player.reloading ? 1 - player.reloadT / w.reload : 0;   // Nachlade-Fortschritt 0..1
+  // Linke Hand + Magazin
+  const L = g.L, a = g.Lrest, b = g.Lmag;
+  let hand = 0, drop = 0;
+  if (player.reloading) {
+    hand = sstep(0.0, 0.25, p) * (1 - sstep(0.82, 1.0, p));        // Hand wandert zum Magazinschacht und zurueck
+    drop = sstep(0.28, 0.42, p) * (1 - sstep(0.55, 0.78, p));       // altes Magazin faellt, neues kommt hoch
+  }
+  L.position.set(a[0] + (b[0] - a[0]) * hand, a[1] + (b[1] - a[1]) * hand, a[2] + (b[2] - a[2]) * hand);
+  if (P.mag) { P.mag.position.y = -drop * 0.16 * S; P.mag.rotation.x = drop * 0.25; if (P.mag.children[0]) P.mag.visible = !(p > 0.4 && p < 0.52); }
+  if (P.bolt && player.reloading) P.bolt.position.z = sstep(0.86, 0.92, p) * (1 - sstep(0.94, 1.0, p)) * 0.045; // Durchladen am Ende
+  if (P.shells) { P.shells.position.set(-hand * 0.02, -hand * 0.02, 0); }
+  if (P.pump) { // Schrotflinte: nach dem Schuss durchladen (Pumpbewegung), auch am Ende des Nachladens
+    const t = pumpT > 0 ? 1 - pumpT / 0.5 : 0, pk = Math.sin(sstep(0.35, 1, t) * Math.PI) * (pumpT > 0 ? 1 : 0);
+    P.pump.position.z = Math.max(pk, player.reloading ? Math.sin(sstep(0.7, 1, p) * Math.PI) : 0) * 0.07;
+  }
+}
+export function kickGun() { slideT = 1; if (player.weapon === 3) pumpT = 0.5; }
 export function selectWeapon(i) {
   if (i === player.weapon && viewGuns[i].visible) return;
   player.weapon = i; player.reloading = false; player.reloadT = 0; player.swapT = 0.25;
@@ -117,6 +148,7 @@ export function shoot() {
   if (hitAny) { const hm = $('hitmark'); hm.className = 'on' + (killAny ? ' kill' : ''); clearTimeout(hm._t); hm._t = setTimeout(() => (hm.className = ''), 90); }
   // Rückstoß & Mündungsfeuer
   player.recoilKick += w.recoil * 30; player.pitch += w.recoil * (0.4 + rnd() * 0.5); player.yaw += rr(-1, 1) * w.recoil * 0.3; player.shake = Math.min(1, player.shake + w.recoil * 6);
+  kickGun();
   flash.visible = true; flash.rotation.z = rnd() * 6; flash.scale.setScalar(w.pellets > 1 ? 1.8 : 1 + rnd() * 0.5); flashLight.intensity = 22; player.flashT = 0.05;
   if (a.mag === 0 && a.reserve > 0) setTimeout(startReload, 250);
   updateHUD();

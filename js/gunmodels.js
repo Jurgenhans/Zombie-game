@@ -89,26 +89,28 @@ const dotSight = (grp, M, x, y, z, w, m) => { put(grp, rbox(w, 0.01, 0.009, 0.00
 
 /* Gibt { group, muzzle(z), rh, lh } zurueck. i: 0 Pistole, 1 MP, 2 Sturmgewehr, 3 Schrotflinte */
 export function buildGunBody(i, M) {
-  const g = new THREE.Group();
-  let muzzle, rh, lh, S = 1;
+  const g = new THREE.Group(), parts = {};
+  const part = (name) => { const q = new THREE.Group(); g.add(q); parts[name] = q; return q; }; // bewegliche Teile (Animation)
+  let muzzle, rh, lh, lhMag, S = 1;
   if (i === 0) { // ------- Pistole
-    S = 1.25;
-    put(g, rbox(0.031, 0.033, 0.19, 0.009, M.steel), 0, 0.03, -0.095);                                            // Schlitten
-    for (let k = 0; k < 6; k++) put(g, rbox(0.0335, 0.028, 0.0035, 0.002, M.dark), 0, 0.031, -0.012 - k * 0.0075);  // Rillen hinten
-    for (let k = 0; k < 3; k++) put(g, rbox(0.0335, 0.028, 0.0035, 0.002, M.dark), 0, 0.031, -0.15 - k * 0.0075);  // Rillen vorn
-    put(g, rbox(0.004, 0.012, 0.05, 0.001, M.black), 0.0155, 0.038, -0.082);                                        // Auswurffenster
+    S = 1.25; const slide = part('slide'), mag = part('mag');
+    put(slide, rbox(0.031, 0.033, 0.19, 0.009, M.steel), 0, 0.03, -0.095);                                            // Schlitten
+    for (let k = 0; k < 6; k++) put(slide, rbox(0.0335, 0.028, 0.0035, 0.002, M.dark), 0, 0.031, -0.012 - k * 0.0075);  // Rillen hinten
+    for (let k = 0; k < 3; k++) put(slide, rbox(0.0335, 0.028, 0.0035, 0.002, M.dark), 0, 0.031, -0.15 - k * 0.0075);  // Rillen vorn
+    put(slide, rbox(0.004, 0.012, 0.05, 0.001, M.black), 0.0155, 0.038, -0.082);                                        // Auswurffenster
     put(g, rbox(0.029, 0.026, 0.165, 0.006, M.poly), 0, 0.0, -0.088);                                               // Rahmen
     put(g, rbox(0.027, 0.006, 0.03, 0.002, M.poly), 0, 0.012, -0.172);                                              // Schienenansatz
     put(g, rbox(0.03, 0.098, 0.056, 0.01, M.grip), 0, -0.058, -0.016, -0.2);                                        // Griff mit Noppen
-    put(g, rbox(0.027, 0.006, 0.054, 0.002, M.dark), 0, -0.111, 0.0, -0.2);                                         // Magazinboden
+    put(mag, rbox(0.027, 0.006, 0.054, 0.002, M.dark), 0, -0.111, 0.0, -0.2); put(mag, rbox(0.024, 0.09, 0.044, 0.005, M.dark), 0, -0.06, -0.016, -0.2);                                         // Magazinboden
     put(g, rbox(0.004, 0.003, 0.03, 0.001, M.dark), 0.0155, 0.018, -0.07);                                          // Slide-Stop
     put(g, cz(0.0068, 0.0068, 0.012, M.dark, 14), 0, 0.03, -0.192);                                                 // Lauf-Muendung
     put(g, cz(0.0038, 0.0038, 0.014, M.black, 10), 0, 0.03, -0.198);
-    dotSight(g, M, 0, 0.0525, -0.178, 0.006); for (const sx of [-1, 1]) dotSight(g, M, sx * 0.0065, 0.0525, -0.012, 0.006);
-    put(g, rbox(0.005, 0.014, 0.01, 0.002, M.dark), 0, 0.028, 0.006, 0.4);                                         // Hammer/Sporn
+    dotSight(slide, M, 0, 0.0525, -0.178, 0.006); for (const sx of [-1, 1]) dotSight(slide, M, sx * 0.0065, 0.0525, -0.012, 0.006);
+    put(slide, rbox(0.005, 0.014, 0.01, 0.002, M.dark), 0, 0.028, 0.006, 0.4);                                         // Hammer/Sporn
     guard(g, M, 0, -0.012, -0.062, 0.06, 0.03, M.poly);
-    muzzle = -0.205; rh = [0.014, -0.06, -0.02]; lh = [-0.026, -0.072, -0.034];
+    muzzle = -0.205; rh = [0.014, -0.06, -0.02]; lh = [-0.026, -0.072, -0.034]; lhMag = [-0.012, -0.115, -0.012];
   } else if (i === 1) { // ------- MP (MP5-artig)
+    const mag = part('mag'), bolt = part('bolt');
     put(g, rbox(0.046, 0.05, 0.3, 0.012, M.steel), 0, 0.012, -0.17);                                                // Gehaeuse
     put(g, rbox(0.018, 0.012, 0.27, 0.004, M.dark), 0, 0.042, -0.17);                                               // Oberseite
     for (let k = 0; k < 4; k++) put(g, rbox(0.048, 0.006, 0.004, 0.001, M.black), 0, 0.012, -0.08 - k * 0.012);      // Kuehlrillen
@@ -119,15 +121,16 @@ export function buildGunBody(i, M) {
     put(g, cz(0.012, 0.012, 0.045, M.dark, 14), 0, 0.016, -0.575); for (let k = 0; k < 4; k++) put(g, rbox(0.003, 0.014, 0.025, 0.001, M.black), 0, 0.016, -0.575, 0, 0, k * Math.PI / 4); // Muendungsfeuerdaempfer
     put(g, cz(0.013, 0.013, 0.016, M.dark, 16), 0, 0.054, -0.4); put(g, rbox(0.004, 0.016, 0.004, 0.001, M.dark), 0, 0.042, -0.4); // Korn im Ring
     put(g, cz(0.013, 0.013, 0.035, M.dark, 16), 0, 0.058, -0.045); put(g, rbox(0.01, 0.006, 0.01, 0.002, M.black), 0, 0.071, -0.045); // Dioptervisier
-    curvedMag(g, M.dark, 0.026, 0.044, 0.19, 5, 0.1, 0, -0.012, -0.235, M.poly);                                     // gebogenes Magazin
+    curvedMag(mag, M.dark, 0.026, 0.044, 0.19, 5, 0.1, 0, -0.012, -0.235, M.poly);                                     // gebogenes Magazin
     put(g, rbox(0.032, 0.095, 0.048, 0.01, M.grip), 0, -0.065, -0.026, -0.28);                                       // Pistolengriff
     put(g, rbox(0.044, 0.04, 0.05, 0.01, M.poly), 0, -0.012, -0.045);                                               // Abzugsgehaeuse
     guard(g, M, 0, -0.03, -0.075, 0.07, 0.026);
-    put(g, cz(0.006, 0.006, 0.02, M.dark, 10), -0.03, 0.03, -0.12, 0, 0, Math.PI / 2);                                // Ladehebel links
+    put(bolt, cz(0.006, 0.006, 0.02, M.dark, 10), -0.03, 0.03, -0.12, 0, 0, Math.PI / 2); put(bolt, rbox(0.01, 0.012, 0.035, 0.002, M.steel), 0.0225, 0.02, -0.1);                                // Ladehebel links
     for (const sx of [-1, 1]) put(g, rbox(0.007, 0.007, 0.22, 0.002, M.dark), sx * 0.02, 0.0, 0.085);                  // Schulterstuetze (Draht)
     put(g, rbox(0.036, 0.07, 0.014, 0.006, M.rubber), 0, 0.0, 0.205);
-    muzzle = -0.6; rh = [0.017, -0.06, -0.04]; lh = [0.0, -0.075, -0.36];
+    muzzle = -0.6; rh = [0.017, -0.06, -0.04]; lh = [0.0, -0.075, -0.36]; lhMag = [0.0, -0.14, -0.245];
   } else if (i === 2) { // ------- Sturmgewehr
+    const mag = part('mag'), bolt = part('bolt');
     put(g, rbox(0.05, 0.066, 0.28, 0.01, M.steel), 0, 0.006, -0.14);                                                // Gehaeuse
     put(g, rbox(0.004, 0.014, 0.05, 0.001, M.black), 0.0255, 0.018, -0.12);                                         // Auswurffenster
     put(g, rbox(0.022, 0.014, 0.3, 0.003, M.dark), 0, 0.048, -0.17);                                                // Montageschiene
@@ -143,15 +146,16 @@ export function buildGunBody(i, M) {
     put(g, rbox(0.014, 0.042, 0.016, 0.003, M.dark), 0, 0.03, -0.76);                                               // Korn-Block
     put(g, rbox(0.003, 0.016, 0.003, 0.001, M.dotG), 0, 0.058, -0.76);
     put(g, cz(0.0135, 0.0135, 0.065, M.dark, 16), 0, 0.012, -0.835); for (let k = 0; k < 4; k++) put(g, rbox(0.003, 0.03, 0.035, 0.001, M.black), 0, 0.012, -0.84, 0, 0, k * Math.PI / 4); // Muendungsfeuerdaempfer
-    curvedMag(g, M.poly, 0.032, 0.072, 0.2, 6, 0.11, 0, -0.025, -0.27, M.dark);                                       // gebogenes Magazin
+    curvedMag(mag, M.poly, 0.032, 0.072, 0.2, 6, 0.11, 0, -0.025, -0.27, M.dark);                                       // gebogenes Magazin
     put(g, rbox(0.036, 0.1, 0.05, 0.012, M.grip), 0, -0.08, -0.03, -0.35);                                          // Pistolengriff
     put(g, rbox(0.046, 0.04, 0.07, 0.01, M.poly), 0, -0.016, -0.05);
     guard(g, M, 0, -0.035, -0.1, 0.08, 0.028);
     put(g, rbox(0.04, 0.082, 0.27, 0.014, M.poly), 0, -0.006, 0.135); put(g, rbox(0.042, 0.092, 0.024, 0.008, M.rubber), 0, -0.006, 0.28); // Schaft + Schulterpolster
-    put(g, cz(0.007, 0.007, 0.03, M.dark, 10), 0.03, 0.03, -0.1, 0, 0, Math.PI / 2);                                  // Ladehebel
+    put(bolt, cz(0.007, 0.007, 0.03, M.dark, 10), 0.03, 0.03, -0.1, 0, 0, Math.PI / 2); put(bolt, rbox(0.01, 0.014, 0.04, 0.002, M.steel), 0.0245, 0.018, -0.115);                                  // Ladehebel
     put(g, rbox(0.004, 0.02, 0.006, 0.001, M.dark), 0.0265, 0.0, -0.06, 0.4);                                        // Feuerwahl
-    muzzle = -0.875; rh = [0.019, -0.065, -0.05]; lh = [0.0, -0.06, -0.42];
+    muzzle = -0.875; rh = [0.019, -0.065, -0.05]; lh = [0.0, -0.06, -0.42]; lhMag = [0.0, -0.15, -0.28];
   } else { // ------- Schrotflinte (Pump Action)
+    const pump = part('pump'), shells = part('shells');
     put(g, rbox(0.046, 0.078, 0.22, 0.01, M.steel), 0, 0.003, -0.1);                                                 // Gehaeuse
     put(g, rbox(0.004, 0.02, 0.07, 0.001, M.black), 0.0235, 0.018, -0.1);                                            // Auswurffenster
     put(g, rbox(0.026, 0.004, 0.06, 0.001, M.black), 0, -0.037, -0.09);                                              // Ladeoeffnung unten
@@ -161,15 +165,15 @@ export function buildGunBody(i, M) {
     for (const zc of [-0.36, -0.62]) put(g, cz(0.0195, 0.0195, 0.012, M.dark, 16), 0, 0.008, zc);                    // Rohrschellen
     put(g, cz(0.0145, 0.0145, 0.024, M.dark, 16), 0, -0.014, -0.76);                                                 // Rohr-Kappe
     put(g, new THREE.Mesh(new THREE.SphereGeometry(0.0034, 8, 6), M.brass), 0, 0.054, -0.83);                         // Perlkorn
-    put(g, rbox(0.054, 0.048, 0.21, 0.018, M.wood), 0, -0.018, -0.43);                                               // Vorderschaft
-    for (let k = 0; k < 6; k++) put(g, rbox(0.0565, 0.03, 0.004, 0.001, M.dark), 0, -0.018, -0.35 - k * 0.026);       // Rillen
+    put(pump, rbox(0.054, 0.048, 0.21, 0.018, M.wood), 0, -0.018, -0.43);                                               // Vorderschaft
+    for (let k = 0; k < 6; k++) put(pump, rbox(0.0565, 0.03, 0.004, 0.001, M.dark), 0, -0.018, -0.35 - k * 0.026);       // Rillen
     put(g, rbox(0.038, 0.094, 0.38, 0.014, M.wood), 0, -0.02, 0.2, 0.06);                                           // Schaft
     put(g, rbox(0.04, 0.1, 0.02, 0.01, M.rubber), 0, -0.036, 0.395, 0.06);                                             // Schaftkappe
     put(g, rbox(0.034, 0.09, 0.052, 0.012, M.woodGrip), 0, -0.066, -0.02, -0.3);                                      // Pistolengriff
     guard(g, M, 0, -0.04, -0.075, 0.07, 0.028);
-    for (let k = 0; k < 2; k++) { put(g, cz(0.0092, 0.0092, 0.036, M.shell, 12), 0.0245, -0.002 - k * 0.0, -0.045 - k * 0.0 - k * 0.022, 0, 0, 0); put(g, cz(0.0094, 0.0094, 0.01, M.brass, 12), 0.0245, -0.002, -0.027 - k * 0.022); } // Patronen an der Seite
-    muzzle = -0.865; rh = [0.019, -0.062, -0.02]; lh = [0.0, -0.045, -0.43];
+    for (let k = 0; k < 2; k++) { put(shells, cz(0.0092, 0.0092, 0.036, M.shell, 12), 0.0245, -0.002 - k * 0.0, -0.045 - k * 0.0 - k * 0.022, 0, 0, 0); put(shells, cz(0.0094, 0.0094, 0.01, M.brass, 12), 0.0245, -0.002, -0.027 - k * 0.022); } // Patronen an der Seite
+    muzzle = -0.865; rh = [0.019, -0.062, -0.02]; lh = [0.0, -0.045, -0.43]; lhMag = [0.01, -0.05, -0.1];
   }
   g.scale.setScalar(S);
-  return { group: g, muzzle: muzzle * S, rh: rh.map((v) => v * S), lh: lh.map((v) => v * S) };
+  return { group: g, parts, muzzle: muzzle * S, rh: rh.map((v) => v * S), lh: lh.map((v) => v * S), lhMag: lhMag.map((v) => v * S), S };
 }
