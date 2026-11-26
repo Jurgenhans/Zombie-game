@@ -258,7 +258,9 @@ export function carEnv() {
   return _carEnv;
 }
 export function carMat(o, k = 1) { const m = new THREE.MeshPhysicalMaterial(o); m.envMap = carEnv(); m.userData.k = k; m.envMapIntensity = settings.night ? 0.12 * k : k; CAR_MATS.push(m); return m; }
-export function applyCarNight(n) { for (const m of CAR_MATS) m.envMapIntensity = n ? 0.12 * m.userData.k : m.userData.k; }
+export const GUN_MATS = []; // Waffen-Materialien (bleiben beim Kartenwechsel erhalten)
+export function gunMat(o, k = 1) { const m = new THREE.MeshStandardMaterial(o); m.envMap = carEnv(); m.userData.k = k; m.envMapIntensity = settings.night ? 0.12 * k : k; GUN_MATS.push(m); return m; }
+export function applyCarNight(n) { for (const m of CAR_MATS.concat(GUN_MATS)) m.envMapIntensity = n ? 0.12 * m.userData.k : m.userData.k; }
 export function addTree(x, z) {
   const g = new THREE.Group();
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 4, 6), lambert(0x3a2e24)); trunk.position.y = 2; g.add(trunk);
