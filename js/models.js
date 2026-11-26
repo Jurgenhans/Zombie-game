@@ -42,7 +42,7 @@ export function getVariant(idx) {
 export const releaseZombie = (z) => { if (z.gen && !z.released) { z.gen.userData.refs--; z.released = true; } };
 // Gelenk-Wrapper: Animationswerte werden zur Grundpose des Generator-Zombies addiert
 export function limb(node, kind) {
-  if (!node) return null;
+  if (!node) return { rotation: { x: 0, y: 0, z: 0 } }; // Teil fehlt (z.B. Armstumpf) -> Platzhalter, damit die Animation nichts prüfen muss
   const b = node.rotation.clone(), o = { rotation: {} };
   for (const ax of ['x', 'y', 'z']) Object.defineProperty(o.rotation, ax, { get: () => 0, set: (v) => { node.rotation[ax] = b[ax] + (kind === 'arm' && ax === 'x' ? v + 1.35 : kind === 'torso' && ax === 'x' ? v - 0.2 : v); } });
   return o;

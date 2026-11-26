@@ -3,6 +3,7 @@ import { initAudio } from './audio.js';
 import { CONFIG, WEAPONS, settings } from './config.js';
 import { $, camera, renderer, scene } from './core.js';
 import { updateEffects } from './effects.js';
+import { clearGore, updateGore } from './gore.js';
 import { sky, stars } from './environment.js';
 import { toast, updateHUD } from './hud.js';
 import { input } from './input.js';
@@ -21,7 +22,7 @@ import { alive, randomSpawn, spawnZombie, updateAudible, updateZombie, waves, zo
 
 export const gameRunning = () => S.running && !player.dead && !S.paused;
 export function resetGame() {
-  zombies.forEach((z) => { scene.remove(z.root); releaseZombie(z); }); zombies.length = 0;
+  zombies.forEach((z) => { scene.remove(z.root); releaseZombie(z); }); zombies.length = 0; clearGore();
   Object.assign(player, { hp: CONFIG.playerMaxHp, kills: 0, dead: false, vy: 0, reloading: false, fireCd: 0, yaw: 0, pitch: 0, recoilKick: 0, swapT: 0 });
   player.pos.set(0, 0, 8); player.ammo = WEAPONS.map((w) => ({ mag: w.mag, reserve: w.reserve }));
   waves.n = 0; waves.active = false; waves.pause = 3; waves.queue = []; S.won = false; setPaused(false);
@@ -51,7 +52,7 @@ export function frame(now) {
   if (settings.showFps) { fpsN++; if (now - fpsT >= 500) { $('fpsBox').textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' FPS'; fpsN = 0; fpsT = now; } }
   if (S.running && !S.paused) update(dt);
   sky.position.copy(camera.position); stars.position.copy(camera.position); stars.rotation.y += dt * 0.003;
-  updateEffects(dt);
+  updateEffects(dt); updateGore(dt);
   updateLamps(now / 1000, camera.position);
   renderer.render(scene, camera);
 }

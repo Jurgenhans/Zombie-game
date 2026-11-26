@@ -4,6 +4,7 @@ import { SFX } from './audio.js';
 import { CONFIG, WEAPONS } from './config.js';
 import { $, clamp, rnd, rr, scene } from './core.js';
 import { emit } from './effects.js';
+import { severPart } from './gore.js';
 import { update } from './flow.js';
 import { hurtPlayer, toast, updateHUD } from './hud.js';
 import { HALF, boxes, groundH } from './mapdata.js';
@@ -36,17 +37,38 @@ export function spawnZombie(x, z, opts = {}) {
     speed: (runner ? rr(3.2, 4.2) : rr(1.1, 2.0)) * (opts.speedMul || 1), dmg: opts.dmg || 12, atkCd: 0, stun: 0, headY: ((src && src.userData.headY) || 1.62) * sc,
     wander: new THREE.Vector3(x, 0, z), phase: rnd() * 6, stuckT: 0, lastP: new THREE.Vector3(x, 0, z), side: 0, dieT: 0, fall: rnd() < 0.5 ? -1 : 1, groanT: rr(3, 9),
     target: null, runner, gen,
+    lost: {}, legMul: 1, atkMul: 1, crawl: false, limbHp: { head: 45 * hp / 100, armL: 34 * hp / 100, armR: 34 * hp / 100, legL: 48 * hp / 100, legR: 48 * hp / 100 }, // Trefferpunkte der abschießbaren Körperteile
   };
   if (gen) gen.userData.refs++;
   root.position.copy(zb.pos); scene.add(root); applyShaderTo(root); zombies.push(zb); return zb;
 }
-export function damageZombie(z, dmg, head, dir, at) {
+export function damageZombie(z, dmg, head, dir, at, pg) {
   z.hp -= dmg; z.stun = 0.2; const za = zAudio(z); SFX.hit(za.vol, za.pan);
   if (z.state === 'wander') { z.state = 'chase'; }
   emit(at, head ? 14 : 7, 'blood', head ? 3.5 : 2.5, 0.05, 9, dir);
+  const name = pg && pg.name;
+  if (name && z.limbHp[name] !== undefined && !z.lost[name]) { // Körperteil getroffen: Teil-Trefferpunkte (ohne Kopfschuss-Bonus) -> bei 0 abgetrennt
+    z.limbHp[name] -= head ? dmg / 2.5 : dmg;
+    if (z.limbHp[name] <= 0) sever(z, name, pg, at, dir);
+  }
   if (z.hp <= 0) { killZombie(z, head); return true; }
   SFX.zhurt(za.vol, za.pan); return false;
 }
+// Körperteil abtrennen: Kopf = sofort tot, Arme = schwächerer Angriff, Beine = langsamer / kriechend
+export function sever(z, name, pg, at, dir) {
+  z.lost[name] = true; z.parts[name] = { rotation: { x: 0, y: 0, z: 0 } };
+  severPart(z, pg, at, dir);
+  if (name === 'head') z.hp = Math.min(z.hp, 0);
+  else if (name[0] === 'a') z.atkMul = z.lost.armL && z.lost.armR ? 0.35 : 0.7;
+  else { const n = (z.lost.legL ? 1 : 0) + (z.lost.legR ? 1 : 0); z.legMul = n === 2 ? 0.22 : 0.55; z.crawl = n === 2; }
+}
+export function preciseHit(z, origin, dir) { // genauer Treffer auf die Modell-Geometrie -> Distanz + getroffenes Körperteil (Gruppe mit userData.part)
+  z.root.updateMatrixWorld(true); _rc.set(origin, dir); _rc.far = 200;
+  const hit = _rc.intersectObject(z.root, true)[0]; if (!hit) return null;
+  let o = hit.object, pg = null; for (; o && o !== z.root; o = o.parent) if (o.userData && o.userData.part) { pg = o; break; }
+  return { t: hit.distance, pg };
+}
+const _rc = new THREE.Raycaster();
 export function killZombie(z, head) {
   z.state = 'dying'; z.dieT = 0; player.kills++; S.killsTotal++; { const za = zAudio(z); SFX.death(za.vol, za.pan); }
   emit(new THREE.Vector3(z.pos.x, z.pos.y + 1, z.pos.z), head ? 25 : 14, 'blood', 3, 0.06, 9);
@@ -94,9 +116,9 @@ export function updateZombie(z, dt) {
   }
   let tx, tz, spd;
   if (z.state === 'chase' || z.state === 'attack') {
-    tx = pp.x; tz = pp.z; spd = z.speed;
+    tx = pp.x; tz = pp.z; spd = z.speed * z.legMul;
     z.state = dist > 80 ? 'wander' : dist < 1.5 && Math.abs(pp.y - z.pos.y) < 1.8 ? 'attack' : 'chase';
-  } else { tx = z.wander.x; tz = z.wander.z; spd = z.speed * 0.4; }
+  } else { tx = z.wander.x; tz = z.wander.z; spd = z.speed * 0.4 * z.legMul; }
   let ang = Math.atan2(tx - z.pos.x, tz - z.pos.z);
   if (z.side) { ang += z.side; z.sideT -= dt; if (z.sideT <= 0) z.side = 0; }
   // Drehung glätten
@@ -105,7 +127,7 @@ export function updateZombie(z, dt) {
     z.pos.x += Math.sin(z.yaw) * spd * dt; z.pos.z += Math.cos(z.yaw) * spd * dt;
   } else if (z.atkCd <= 0) {
     z.atkCd = 1.1; z.atkAnim = 0.45;
-    setTimeout(() => { if (z.state === 'attack' && !player.dead && z.hp > 0 && Math.hypot(player.pos.x - z.pos.x, player.pos.z - z.pos.z) < 2) hurtPlayer(z.dmg); }, 300);
+    setTimeout(() => { if (z.state === 'attack' && !player.dead && z.hp > 0 && Math.hypot(player.pos.x - z.pos.x, player.pos.z - z.pos.z) < 2) hurtPlayer(z.dmg * z.atkMul); }, 300);
   }
   const stepIdx = Math.floor(z.phase / Math.PI); // Schritt bei jedem Beinwechsel – nur für die nächsten Zombies hörbar
   if (stepIdx !== z.stepIdx) { z.stepIdx = stepIdx; if (z.state !== 'attack' && audible.has(z)) { const a = audioOf(z, dist); SFX.step(a.vol, a.pan, z.runner); } }
@@ -114,6 +136,7 @@ export function updateZombie(z, dt) {
   // Hängen geblieben? -> seitlich ausweichen
   z.stuckT += dt; if (z.stuckT > 0.5) { if (z.state === 'chase' && z.pos.distanceTo(z.lastP) < spd * 0.5 * 0.3) { z.side = (rnd() < 0.5 ? 1 : -1) * rr(1.0, 1.7); z.sideT = rr(0.8, 1.6); } z.lastP.copy(z.pos); z.stuckT = 0; }
   z.pos.y = groundH(z.pos.x, z.pos.z); z.root.position.set(z.pos.x, z.pos.y, z.pos.z); z.root.rotation.set(0, z.yaw, 0);
+  if (z.crawl) z.root.position.y -= 0.72; else if (z.lost.legL !== z.lost.legR) z.root.rotation.z = z.lost.legL ? 0.16 : -0.16; // ohne Beine: Oberkörper am Boden; ein Bein: schief
   // Animation
   const sw = Math.sin(z.phase), amp = z.state === 'attack' ? 0.1 : (z.runner ? 0.9 : 0.55);
   if (z.parts) {
@@ -122,7 +145,7 @@ export function updateZombie(z, dt) {
     if (z.atkAnim > 0) { z.atkAnim -= dt; arm = -1.35 + Math.sin(Math.min(1, z.atkAnim / 0.45) * Math.PI) * -0.9; }
     z.parts.armL.rotation.x = arm; z.parts.armR.rotation.x = arm + 0.1;
     if (z.parts.foreL) { z.parts.foreL.rotation.x = -0.7; z.parts.foreR.rotation.x = -0.7; } z.parts.armL.rotation.z = 0.08; z.parts.armR.rotation.z = -0.08;
-    z.parts.torso.rotation.x = 0.2 + Math.abs(sw) * 0.05; z.parts.torso.rotation.z = sw * 0.06; z.parts.head.rotation.z = Math.sin(z.phase * 0.7) * 0.12;
+    z.parts.torso.rotation.x = 0.2 + Math.abs(sw) * 0.05 + (z.crawl ? 0.9 : 0); z.parts.torso.rotation.z = sw * 0.06; z.parts.head.rotation.z = Math.sin(z.phase * 0.7) * 0.12;
   } else { z.root.rotation.x = 0.12; z.root.position.y += Math.abs(sw) * 0.06; z.root.rotation.z = sw * 0.05; }
 }
 

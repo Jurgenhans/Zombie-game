@@ -10,7 +10,7 @@ import { PLAYER_SPEC } from './models.js';
 import { gunMat } from './props.js';
 import { _o, rayBox, raySphere } from './physics.js';
 import { player } from './state.js';
-import { damageZombie, noise, zombies } from './zombies.js';
+import { damageZombie, noise, preciseHit, zombies } from './zombies.js';
 
 /* Viewmodel */
 export const view = new THREE.Group(); camera.add(view);
@@ -134,11 +134,13 @@ export function shoot() {
       if (th < tBest) { tBest = th; best = z; head = true; }
       for (const yy of [0.35, 0.8, 1.25]) { const tb = raySphere(origin, _d, _o.set(z.pos.x, z.pos.y + yy, z.pos.z), 0.38); if (tb < tBest) { tBest = tb; best = z; head = false; } }
     }
+    let pg = null;
+    if (best && best.gen) { const ph = preciseHit(best, origin, _d); if (ph) { tBest = ph.t; pg = ph.pg; head = !!pg && pg.name === 'head'; } } // genauer Treffer: Kopf/Arm/Bein
     const end = new THREE.Vector3().copy(origin).addScaledVector(_d, tBest);
     if (p < 3) addTracer(_w, end);
     if (best) {
       hitAny = true; const dmg = w.dmg * (head ? 2.5 : 1) * (1 - Math.min(0.5, tBest / (w.range * 2)));
-      if (damageZombie(best, dmg, head, _d, end)) killAny = true;
+      if (damageZombie(best, dmg, head, _d, end, pg)) killAny = true;
     } else if (wn) {
       const n = new THREE.Vector3(wn.nx || 0, wn.ny || 0, wn.nz || 0);
       addDecal(end, n); emit(end, 3, 'spark', 2.5, 0.03, 9, n); emit(end, 2, 'dust', 1.2, 0.08, 1, n);

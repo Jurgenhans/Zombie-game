@@ -12,7 +12,7 @@ Ego-Shooter in Three.js, per Capacitor als Android-APK verpackt (GitHub Actions:
 
 ## Wellen & Zombie-Modelle (später)
 In `game.js` → `CONFIG.wavesEnabled = true` aktiviert das fertige Wellensystem. Bis dahin stehen `trainingZombies` als Übungsziele auf der Map (`0` = keine).
-Zombies kommen aus dem eingebauten Generator (`zombiegen.js`, 300 Varianten, zur Laufzeit erzeugt). Fallbacks: `assets/models/zombie.glb`, dann prozedurales Modell.
+Zombies kommen aus dem eingebauten Generator 2 (`zombiegen.js`, 300 Varianten, zur Laufzeit erzeugt). Kopf, Arme und Beine lassen sich abschießen (`js/gore.js`: fliegende Teile, Blut, Lachen). Fallbacks: `assets/models/zombie.glb`, dann prozedurales Modell.
 
 ## Code-Struktur
 
