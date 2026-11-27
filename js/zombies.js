@@ -8,7 +8,7 @@ import { severPart } from './gore.js';
 import { update } from './flow.js';
 import { hurtPlayer, toast, updateHUD } from './hud.js';
 import { HALF, boxes, groundH } from './mapdata.js';
-import { ZOMBIE_SPEC, buildHumanoid, getVariant, limb, models, releaseZombie } from './models.js';
+import { ZOMBIE_SPEC, buildHumanoid, getVariant, limb, meshList, models, releaseZombie, updateLod } from './models.js';
 import { setPaused } from './options.js';
 import { resolveCircle } from './physics.js';
 import { applyShaderTo } from './shader.js';
@@ -39,7 +39,7 @@ export function spawnZombie(x, z, opts = {}) {
     target: null, runner, gen,
     lost: {}, legMul: 1, atkMul: 1, crawl: false, limbHp: { head: 45 * hp / 100, armL: 34 * hp / 100, armR: 34 * hp / 100, legL: 48 * hp / 100, legR: 48 * hp / 100 }, // Trefferpunkte der abschießbaren Körperteile
   };
-  if (gen) gen.userData.refs++;
+  if (gen) { gen.userData.refs++; zb.meshes = meshList(root); zb.geos0 = zb.meshes.map((m) => m.geometry); zb.lod = 0; zb.lodT = 0; }
   root.position.copy(zb.pos); scene.add(root); applyShaderTo(root); zombies.push(zb); return zb;
 }
 export function damageZombie(z, dmg, head, dir, at, pg) {
@@ -97,6 +97,7 @@ export function zAudio(z) { // Lautstärke/Richtung für Treffer- und Sterbeger�
 }
 export function updateZombie(z, dt) {
   const pp = player.pos; const dx = pp.x - z.pos.x, dz = pp.z - z.pos.z; const dist = Math.hypot(dx, dz);
+  if (z.gen && (z.lodT -= dt) <= 0) { z.lodT = 0.3 + rnd() * 0.2; updateLod(z, dist); } // Detailstufe nach Entfernung
   z.t += dt; z.phase += dt * (z.state === 'chase' ? z.speed * 2.2 : 3);
   if (z.state === 'dying') {
     z.dieT += dt; const k = Math.min(1, z.dieT / 0.9), e = 1 - (1 - k) * (1 - k);

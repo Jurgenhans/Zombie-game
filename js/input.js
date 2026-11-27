@@ -20,7 +20,7 @@ export function joyUpdate(x, y) {
 }
 export function joyReset() { joy.id = null; input.mx = input.mz = 0; input.sprintAuto = false; joyKnob.style.transform = 'translate(0,0)'; joyBase.classList.add('idle'); joyBase.style.left = joyBase.style.top = joyBase.style.bottom = ''; }
 window.addEventListener('pointerdown', (e) => {
-  if (e.target.closest && e.target.closest('.btn')) return;
+  if (e.target.closest && e.target.closest('.btn, #btnBuy')) return;
   if (!gameRunning() || e.pointerType === 'mouse') return;
   if (e.clientX < window.innerWidth * 0.4 && joy.id === null) {
     joy.id = e.pointerId; joy.cx = e.clientX; joy.cy = e.clientY; joyBase.classList.remove('idle'); joyBase.style.left = (joy.cx - 75) + 'px'; joyBase.style.top = (joy.cy - 75) + 'px'; joyBase.style.bottom = 'auto'; joyUpdate(e.clientX, e.clientY);

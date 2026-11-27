@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildZombie, disposeZombie } from '../zombiegen.js';
 import { rr } from './core.js';
+import { LOD_DIST, LOD_RATIO, simplify } from './lod.js';
 import { player } from './state.js';
 import { zombies } from './zombies.js';
 
@@ -36,8 +37,27 @@ export function getVariant(idx) {
   let g = variantCache.get(idx);
   if (g) { variantCache.delete(idx); variantCache.set(idx, g); return g; }
   g = buildZombie(idx); g.userData.refs = 0; variantCache.set(idx, g);
-  for (const [k, v] of variantCache) { if (variantCache.size <= 40) break; if (v.userData.refs === 0 && k !== idx) { disposeZombie(v); variantCache.delete(k); } }
+  for (const [k, v] of variantCache) { if (variantCache.size <= 40) break; if (v.userData.refs === 0 && k !== idx) { disposeZombie(v); (lodMap.get(v) || []).forEach((gs) => gs && gs.forEach((g) => g.dispose())); lodMap.delete(v); variantCache.delete(k); } }
   return g;
+}
+// LOD: vereinfachte Geometrien je Variante (gleiche Mesh-Reihenfolge wie das Original), nur bei Bedarf berechnet
+const lodMap = new WeakMap();
+export const meshList = (o) => { const a = []; o.traverse((m) => { if (m.isMesh) a.push(m); }); return a; };
+export function getLodGeos(gen, lod) {
+  let e = lodMap.get(gen); if (!e) lodMap.set(gen, (e = []));
+  return e[lod] || (e[lod] = meshList(gen).map((m) => simplify(m.geometry, LOD_RATIO[lod])));
+}
+export function applyLod(z, lod) {
+  if (!z.gen || z.lod === lod) return;
+  const geos = lod ? getLodGeos(z.gen, lod) : z.geos0;
+  for (let i = 0; i < z.meshes.length; i++) z.meshes[i].geometry = geos[i];
+  z.lod = lod;
+}
+export function updateLod(z, dist) { // mit Hysterese (2 m), damit nichts flackert
+  let l = z.lod || 0;
+  while (l < 2 && dist > LOD_DIST[l]) l++;
+  while (l > 0 && dist < LOD_DIST[l - 1] - 2) l--;
+  applyLod(z, l);
 }
 export const releaseZombie = (z) => { if (z.gen && !z.released) { z.gen.userData.refs--; z.released = true; } };
 // Gelenk-Wrapper: Animationswerte werden zur Grundpose des Generator-Zombies addiert

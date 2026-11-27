@@ -87,3 +87,4 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:syste
 
 #btnBuy{position:fixed;left:50%;bottom:24%;transform:translateX(-50%);z-index:30;padding:14px 22px;font:700 16px system-ui,sans-serif;color:#1a1200;background:#ffd24a;border:3px solid #fff;border-radius:12px;box-shadow:0 0 18px #ffd24a99}
 #btnBuy.hidden{display:none}
+#hud #btnBuy{pointer-events:auto;touch-action:none}
