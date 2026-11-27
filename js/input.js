@@ -2,7 +2,8 @@ import { CONFIG, WEAPONS, settings } from './config.js';
 import { $, canvas, clamp } from './core.js';
 import { gameRunning } from './flow.js';
 import { S, player } from './state.js';
-import { selectWeapon, startReload } from './weapons.js';
+import { buyAmmo } from './pickups.js';
+import { nextWeapon, selectWeapon, startReload } from './weapons.js';
 
 /* ---------------- Input ---------------- */
 export const input = { mx: 0, mz: 0, fire: false, fireQueued: false, sprint: false, jump: false, keys: {} };
@@ -44,13 +45,14 @@ export function bindBtn(id, down, upfn) {
 bindBtn('btnFire', (e) => { input.fire = true; input.fireQueued = true; fireBtnPointer = e.pointerId; fbx = e.clientX; fby = e.clientY; }, () => { input.fire = false; fireBtnPointer = null; });
 bindBtn('btnJump', () => { input.jump = true; }, () => { input.jump = false; });
 bindBtn('btnReload', () => startReload());
-bindBtn('btnSwap', () => selectWeapon((player.weapon + 1) % WEAPONS.length));
+bindBtn('btnSwap', () => nextWeapon());
+$('btnBuy').addEventListener('click', () => buyAmmo());
 bindBtn('btnSprint', () => { input.sprint = !input.sprint; $('btnSprint').classList.toggle('on', input.sprint); });
 // Desktop
 window.addEventListener('keydown', (e) => {
   input.keys[e.code] = true;
-  if (e.code === 'KeyR') startReload(); if (e.code === 'KeyQ') selectWeapon((player.weapon + 1) % WEAPONS.length);
-  if (e.code >= 'Digit1' && e.code <= 'Digit4') selectWeapon(+e.code.slice(5) - 1);
+  if (e.code === 'KeyR') startReload(); if (e.code === 'KeyQ') nextWeapon(); if (e.code === 'KeyE') buyAmmo();
+  if (e.code >= 'Digit1' && e.code <= 'Digit5') selectWeapon(+e.code.slice(5) - 1);
 });
 window.addEventListener('keyup', (e) => (input.keys[e.code] = false));
 canvas.addEventListener('mousedown', (e) => { if (!gameRunning()) return; if (document.pointerLockElement !== canvas) { canvas.requestPointerLock && canvas.requestPointerLock(); return; } input.fire = true; input.fireQueued = true; });

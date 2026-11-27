@@ -21,6 +21,7 @@ export const WEAPONS = [
   { name: 'MP',      dmg: 17, pellets: 1, spread: 0.014, rate: 0.085, auto: true,  mag: 32, reserve: 160, reload: 1.8, recoil: 0.008, range: 70, color: 0x303036, len: 0.42, snd: 1 },
   { name: 'STURMGEWEHR', dmg: 34, pellets: 1, spread: 0.008, rate: 0.12, auto: true, mag: 30, reserve: 120, reload: 2.2, recoil: 0.012, range: 140, color: 0x3a3d33, len: 0.7, snd: 2 },
   { name: 'SCHROTFLINTE', dmg: 13, pellets: 9, spread: 0.055, rate: 0.9, auto: false, mag: 6, reserve: 30, reload: 2.5, recoil: 0.07, range: 30, color: 0x4a3a2a, len: 0.75, snd: 3 },
+  { name: 'MINIGUN', dmg: 16, pellets: 1, spread: 0.03, rate: 0.04, auto: true, mag: 200, reserve: 0, reload: 4.5, recoil: 0.003, range: 90, color: 0x303030, len: 0.8, snd: 1 }, // fällt in Welle 5
 ];
 
 /* ---------------- Optionen: Steuerung, Grafik, Shader ---------------- */

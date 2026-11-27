@@ -36,3 +36,7 @@ Zombies kommen aus dem eingebauten Generator 2 (`zombiegen.js`, 300 Varianten, z
 | `flow.js` | Spielablauf (Start, Update, Hauptschleife) |
 
 Außerdem im Hauptordner: `zombiegen.js` (Zombie-Generator), `trash.js` (Müll).
+
+## Minigun, Gold & Munitionsautomat
+- Jeder besiegte Zombie gibt 5 Gold. Am gelben Automaten (nahe Start, Taste E oder Button KAUFEN) gibt es 50 Schuss für 50 Gold für die aktuelle Waffe.
+- Zu Beginn von Welle 5 fällt die Minigun (200 Schuss, gelber Lichtstrahl) in der Nähe vom Spieler ab.

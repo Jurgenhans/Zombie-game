@@ -154,6 +154,19 @@ export function buildGunBody(i, M) {
     put(bolt, cz(0.007, 0.007, 0.03, M.dark, 10), 0.03, 0.03, -0.1, 0, 0, Math.PI / 2); put(bolt, rbox(0.01, 0.014, 0.04, 0.002, M.steel), 0.0245, 0.018, -0.115);                                  // Ladehebel
     put(g, rbox(0.004, 0.02, 0.006, 0.001, M.dark), 0.0265, 0.0, -0.06, 0.4);                                        // Feuerwahl
     muzzle = -0.875; rh = [0.019, -0.065, -0.05]; lh = [0.0, -0.06, -0.42]; lhMag = [0.0, -0.15, -0.28];
+  } else if (i === 4) { // ------- Minigun (rotierendes Laufbündel)
+    const barrels = part('barrels');
+    put(g, rbox(0.07, 0.07, 0.3, 0.015, M.steel), 0, 0.012, -0.1);
+    put(g, cz(0.045, 0.045, 0.14, M.dark, 18), 0, 0.015, -0.27);
+    put(g, rbox(0.02, 0.02, 0.18, 0.006, M.dark), 0, 0.075, -0.1); put(g, rbox(0.02, 0.05, 0.02, 0.006, M.dark), 0, 0.055, -0.18);
+    barrels.position.set(0, 0.015, -0.52);
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; put(barrels, cz(0.0075, 0.0075, 0.5, M.dark, 8), Math.cos(a) * 0.024, Math.sin(a) * 0.024, 0); }
+    for (const zc of [0.22, 0.0, -0.22]) put(barrels, cz(0.034, 0.034, 0.012, M.steel, 18), 0, 0, zc);
+    put(g, rbox(0.1, 0.09, 0.15, 0.01, M.poly), 0, -0.075, -0.1); put(g, rbox(0.104, 0.02, 0.154, 0.006, M.brass), 0, -0.04, -0.1);
+    put(g, rbox(0.034, 0.09, 0.05, 0.012, M.grip), 0, -0.06, 0.04, -0.2);
+    guard(g, M, 0, -0.035, 0.0, 0.06, 0.028);
+    put(g, rbox(0.05, 0.07, 0.03, 0.008, M.rubber), 0, 0.0, 0.17);
+    muzzle = -0.78; rh = [0.018, -0.062, 0.04]; lh = [0.0, -0.14, -0.14]; lhMag = lh;
   } else { // ------- Schrotflinte (Pump Action)
     const pump = part('pump'), shells = part('shells');
     put(g, rbox(0.046, 0.078, 0.22, 0.01, M.steel), 0, 0.003, -0.1);                                                 // Gehaeuse

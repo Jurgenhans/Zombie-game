@@ -12,7 +12,7 @@ import { MAPS, boxes, mapId } from './mapdata.js';
 import { releaseZombie } from './models.js';
 import { setPaused } from './options.js';
 import { _o, rayBox, raySphere, resolveCircle, supportY } from './physics.js';
-import { spawnPickups, updatePickups } from './pickups.js';
+import { buildVending, clearDrops, spawnPickups, updatePickups } from './pickups.js';
 import { S, player } from './state.js';
 import { _d, animateGun, finishReload, flash, flashLight, selectWeapon, shoot, view, viewGuns } from './weapons.js';
 import { loadMap } from './world.js';
@@ -23,12 +23,12 @@ import { alive, randomSpawn, spawnZombie, updateAudible, updateZombie, waves, zo
 export const gameRunning = () => S.running && !player.dead && !S.paused;
 export function resetGame() {
   zombies.forEach((z) => { scene.remove(z.root); releaseZombie(z); }); zombies.length = 0; clearGore();
-  Object.assign(player, { hp: CONFIG.playerMaxHp, kills: 0, dead: false, vy: 0, reloading: false, fireCd: 0, yaw: 0, pitch: 0, recoilKick: 0, swapT: 0 });
+  Object.assign(player, { hp: CONFIG.playerMaxHp, kills: 0, dead: false, vy: 0, reloading: false, fireCd: 0, yaw: 0, pitch: 0, recoilKick: 0, swapT: 0, gold: 0, owned: [true, true, true, true, false] });
   player.pos.set(0, 0, 8); player.ammo = WEAPONS.map((w) => ({ mag: w.mag, reserve: w.reserve }));
   waves.n = 0; waves.active = false; waves.pause = 3; waves.queue = []; S.won = false; setPaused(false);
   $('goTitle').textContent = 'GAME OVER'; $('goTitle').classList.add('red'); $('goTitle').classList.remove('green');
   for (let i = 0; i < CONFIG.trainingZombies && !CONFIG.wavesEnabled; i++) { const p = randomSpawn(18, 60); spawnZombie(p.x, p.z); }
-  spawnPickups(); selectWeapon(0); viewGuns.forEach((g, k) => (g.visible = k === 0)); updateHUD();
+  clearDrops(); spawnPickups(); buildVending(); selectWeapon(0); viewGuns.forEach((g, k) => (g.visible = k === 0)); updateHUD();
 }
 export async function startGame(id) {
   id = id || mapId || 'big'; initAudio();

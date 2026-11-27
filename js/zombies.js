@@ -70,7 +70,7 @@ export function preciseHit(z, origin, dir) { // genauer Treffer auf die Modell-G
 }
 const _rc = new THREE.Raycaster();
 export function killZombie(z, head) {
-  z.state = 'dying'; z.dieT = 0; player.kills++; S.killsTotal++; { const za = zAudio(z); SFX.death(za.vol, za.pan); }
+  z.state = 'dying'; z.dieT = 0; player.kills++; player.gold += 5; S.killsTotal++; { const za = zAudio(z); SFX.death(za.vol, za.pan); }
   emit(new THREE.Vector3(z.pos.x, z.pos.y + 1, z.pos.z), head ? 25 : 14, 'blood', 3, 0.06, 9);
   updateHUD();
 }
@@ -156,7 +156,7 @@ export const waves = {
     this.n++; this.active = true; this.spawnT = 1;
     const q = []; for (let i = 0; i < this.n * 10; i++) q.push(i);
     for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
-    this.queue = q; toast('WELLE ' + this.n + ' – ' + q.length + ' ZOMBIES'); updateHUD();
+    this.queue = q; toast('WELLE ' + this.n + ' – ' + q.length + ' ZOMBIES'); if (this.onStart) this.onStart(this.n); updateHUD();
   },
   update(dt) {
     if (!CONFIG.wavesEnabled || player.dead || S.won) return;
@@ -170,7 +170,7 @@ export const waves = {
     } else if (alive() === 0) {
       this.active = false; this.pause = 8;
       if (this.n >= CONFIG.maxWave) { victory(); return; }
-      player.hp = Math.min(CONFIG.playerMaxHp, player.hp + 25); player.ammo.forEach((a, i) => (a.reserve += WEAPONS[i].mag));
+      player.hp = Math.min(CONFIG.playerMaxHp, player.hp + 25); player.ammo.forEach((a, i) => { if (player.owned[i]) a.reserve += WEAPONS[i].mag; });
       toast('WELLE ' + this.n + ' GESCHAFFT  (+25 Leben, +Munition)'); updateHUD();
     }
   },

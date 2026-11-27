@@ -10,10 +10,10 @@ export function updateHUD() {
   $('hpfill').style.width = Math.max(0, player.hp / CONFIG.playerMaxHp * 100) + '%'; $('hptext').textContent = Math.max(0, Math.ceil(player.hp));
   $('wave').textContent = CONFIG.wavesEnabled ? (waves.n || 1) + '/' + CONFIG.maxWave : '–';
   $('remaining').textContent = alive() + (CONFIG.wavesEnabled ? waves.queue.length : 0);
-  $('kills').textContent = player.kills;
+  $('kills').textContent = player.kills; $('gold').textContent = player.gold;
   $('wname').textContent = w.name; $('mag').textContent = a.mag; $('reserve').textContent = a.reserve;
   $('ammo').classList.toggle('low', a.mag <= Math.ceil(w.mag * 0.25));
-  $('slots').innerHTML = WEAPONS.map((_, i) => `<i class="${i === player.weapon ? 'on' : ''}"></i>`).join('');
+  $('slots').innerHTML = WEAPONS.map((_, i) => (player.owned[i] ? `<i class="${i === player.weapon ? 'on' : ''}"></i>` : '')).join('');
 }
 export let toastT = 0;
 export function toast(t) { const el = $('toast'); el.textContent = t; el.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => (el.style.opacity = 0), 1400); }

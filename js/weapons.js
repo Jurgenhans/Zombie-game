@@ -21,7 +21,7 @@ export const flash = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.25), flashMa
 export const flashLight = new THREE.PointLight(0xffc070, 0, 12); flashLight.visible = true; camera.add(flashLight); flashLight.position.set(0.2, -0.1, -0.8);
 export function buildViewGuns() {
   const M = gunMats(gunMat), glove = lambert(0x2a2c30), cuff = lambert(0x1c1d20), jacket = lambert(0x3b4237); // Armel: dunkles Olivgruen
-  const VOFF = [[-0.03, 0.01, 0.0], [-0.05, 0.015, 0.2], [-0.06, 0.01, 0.3], [-0.06, 0.01, 0.3]]; // Waffe nach hinten/vorn verschieben, damit Schaft nicht in die Kamera ragt
+  const VOFF = [[-0.03, 0.01, 0.0], [-0.05, 0.015, 0.2], [-0.06, 0.01, 0.3], [-0.06, 0.01, 0.3], [-0.04, 0.0, 0.35]]; // Waffe nach hinten/vorn verschieben, damit Schaft nicht in die Kamera ragt
   WEAPONS.forEach((w, i) => {
     const g = new THREE.Group(), B = buildGunBody(i, M); g.add(B.group);
     const add = (grp, geo, m, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); grp.add(o); return o; };
@@ -52,7 +52,7 @@ export function buildViewGuns() {
 buildViewGuns();
 /* Waffen-Animation (nur Transformationen bestehender Teile, keine Allokation):
    Rueckstoss von Schlitten/Verschluss/Pumpe beim Schuss, Magazinwechsel mit Linkshand beim Nachladen. */
-let slideT = 0, pumpT = 0;
+let slideT = 0, pumpT = 0, spinV = 0;
 const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 export function animateGun(dt) {
   const g = viewGuns[player.weapon]; if (!g || !g.parts) return;
@@ -60,6 +60,7 @@ export function animateGun(dt) {
   if (slideT > 0) slideT = Math.max(0, slideT - dt / Math.min(0.12, w.rate * 0.9));
   if (pumpT > 0) pumpT = Math.max(0, pumpT - dt);
   const k = Math.sin(Math.min(1, 1 - slideT) * Math.PI) * (slideT > 0 ? 1 : 0); // 0 -> 1 -> 0 ueber die Rueckstosszeit
+  spinV = Math.max(0, spinV - dt * 25); if (P.barrels) P.barrels.rotation.z -= spinV * dt; // Minigun: Laufbündel dreht beim Feuern
   if (P.slide) P.slide.position.z = k * 0.032;                    // Pistole: Schlitten faehrt zurueck
   if (P.bolt) P.bolt.position.z = k * 0.045;                      // MP/Gewehr: Verschluss + Ladehebel
   let p = player.reloading ? 1 - player.reloadT / w.reload : 0;   // Nachlade-Fortschritt 0..1
@@ -79,8 +80,10 @@ export function animateGun(dt) {
     P.pump.position.z = Math.max(pk, player.reloading ? Math.sin(sstep(0.7, 1, p) * Math.PI) : 0) * 0.07;
   }
 }
-export function kickGun() { slideT = 1; if (player.weapon === 3) pumpT = 0.5; }
+export function kickGun() { slideT = 1; if (player.weapon === 4) spinV = 32; if (player.weapon === 3) pumpT = 0.5; }
+export function nextWeapon() { for (let k = 1; k <= WEAPONS.length; k++) { const i = (player.weapon + k) % WEAPONS.length; if (player.owned[i]) return selectWeapon(i); } }
 export function selectWeapon(i) {
+  if (!player.owned[i]) return;
   if (i === player.weapon && viewGuns[i].visible) return;
   player.weapon = i; player.reloading = false; player.reloadT = 0; player.swapT = 0.25;
   viewGuns.forEach((g, k) => (g.visible = k === i));
