@@ -43,3 +43,6 @@ Außerdem im Hauptordner: `zombiegen.js` (Zombie-Generator), `trash.js` (Müll).
 
 ## Zombie-LOD
 Ab 10 m werden Zombies mit 50 % der Dreiecke gezeichnet, ab 20 m mit 10 % (`js/lod.js`).
+
+## Absperrgitter
+Vor etwa jedem dritten Eingang der begehbaren Häuser stehen Festival-Absperrgitter (3 Module à 2,2 m, `js/fences.js`, mit Kollision).

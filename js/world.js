@@ -5,6 +5,7 @@ import { FACADE, FLOOR_H, TILE_H, TILE_W, applyFacadeNight, buildEnterable, faca
 import { settings } from './config.js';
 import { canvasTex, hashXZ, lambert, mkRng, renderer, resetSeed, rnd, rr } from './core.js';
 import { LAMP, applyLampNight } from './lamps.js';
+import { finalizeFences, resetFences } from './fences.js';
 import { HALF, MAP, SIDEWALK_H, addBox, boxes, groundH, interiorSpots, mapRoot, setMap } from './mapdata.js';
 import { CAR_MATS, addTree, buildStreetProps, crateMats, cratePostMat } from './props.js';
 import { applyShaderTo, phongCache } from './shader.js';
@@ -12,12 +13,12 @@ import { alive } from './zombies.js';
 
 export function disposeMap() {
   mapRoot.traverse((o) => { if (o.geometry) o.geometry.dispose(); for (const m of (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [])) { if (m.map) m.map.dispose(); m.dispose(); } });
-  mapRoot.clear(); boxes.length = 0; interiorSpots.length = 0; phongCache.clear(); FACADE.mats = []; FACADE.neon = []; FACADE.pools = []; FACADE.cache = {}; CAR_MATS.length = 0;
+  mapRoot.clear(); resetFences(); boxes.length = 0; interiorSpots.length = 0; phongCache.clear(); FACADE.mats = []; FACADE.neon = []; FACADE.pools = []; FACADE.cache = {}; CAR_MATS.length = 0;
   Object.assign(LAMP, { list: [], alive: [], flick: [], lights: [], ready: false, pools: null, halos: null, haloCol: null });
 }
 export function loadMap(id) {
   disposeMap(); setMap(id); resetSeed();
-  buildGround(); buildCity(); applyShaderTo(mapRoot); applyLampNight(settings.night); applyFacadeNight(settings.night);
+  buildGround(); buildCity(); finalizeFences(); applyShaderTo(mapRoot); applyLampNight(settings.night); applyFacadeNight(settings.night);
 }
 export let groundTex = null;
 export function buildGround() {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { settings } from './config.js';
 import { canvasTex, hashXZ, lambert, mkRng, renderer, rnd, rr } from './core.js';
+import { addFenceLine } from './fences.js';
 import { radialTex } from './lamps.js';
 import { boxes, interiorSpots, mapRoot } from './mapdata.js';
 import { crateMats } from './props.js';
@@ -232,7 +233,8 @@ export function buildEnterable(cx, cz, w, d, h, tex) {
   if (rnd() < 0.6) cabinet(cx + RD - 0.3, cz + hd - T - 0.4, 0.5, 0.6, 1.0, lambert(0x6b5a3c));
   { const cr = mkRng(hashXZ(cx, cz) + 77); // Vordaecher mit Neon-Reklame (eigener RNG)
     const doors = [[cx, cz - hd, 0, -1], [cx, cz + hd, 0, 1], [cx - hw, cz, -1, 0], [cx + hw, cz, 1, 0]];
-    doors.forEach(([px, pz, ax, az]) => { if (cr() < 0.5) addCanopy(px, pz, ax, az, (cr() * 99) | 0); }); }
+    doors.forEach(([px, pz, ax, az]) => { if (cr() < 0.5) addCanopy(px, pz, ax, az, (cr() * 99) | 0); });
+    const fr = mkRng(hashXZ(cx, cz) + 123); doors.forEach(([px, pz, ax, az]) => { if (fr() < 0.35) addFenceLine(px, pz, ax, az, fr); }); } // Absperrgitter vor manchen Eingängen
   interiorSpots.push({ x: cx, z: cz });
   if (rnd() < 0.5) interiorSpots.push({ x: cx + (rnd() < 0.5 ? -1 : 1) * 3.2, z: cz + 0.0 });
   if (rnd() < 0.5) { const a = new THREE.Mesh(new THREE.BoxGeometry(w * .3, 2, d * .3), roofMat); a.position.set(cx + rr(-w / 4, w / 4), h + 1, cz + rr(-d / 4, d / 4)); mapRoot.add(a); }
