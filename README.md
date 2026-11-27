@@ -42,4 +42,4 @@ Außerdem im Hauptordner: `zombiegen.js` (Zombie-Generator), `trash.js` (Müll).
 - Zu Beginn von Welle 5 fällt die Minigun (200 Schuss, gelber Lichtstrahl) in der Nähe vom Spieler ab.
 
 ## Zombie-LOD
-Ab 20 m werden Zombies mit 50 % der Dreiecke gezeichnet, ab 30 m mit 20 % (`js/lod.js`).
+Ab 10 m werden Zombies mit 50 % der Dreiecke gezeichnet, ab 20 m mit 10 % (`js/lod.js`).

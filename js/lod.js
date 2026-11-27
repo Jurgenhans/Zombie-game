@@ -3,8 +3,8 @@ import * as THREE from 'three';
 /* ---------------- Zombie-LOD: weniger Dreiecke bei Entfernung ----------------
    Vertex-Clustering: Eckpunkte in einem Raster zusammenfassen, entartete Dreiecke entfernen.
    Gleiche Mesh-Reihenfolge wie das Original -> pro Zombie wird nur mesh.geometry getauscht. */
-export const LOD_RATIO = [1, 0.5, 0.2];
-export const LOD_DIST = [20, 30]; // ab 20 m 50 %, ab 30 m 20 %
+export const LOD_RATIO = [1, 0.5, 0.1];
+export const LOD_DIST = [10, 20]; // ab 10 m 50 %, ab 20 m 10 %
 
 function cluster(g, cell) {
   const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv, ix = g.index.array, b = g.boundingBox;
