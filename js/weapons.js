@@ -21,7 +21,7 @@ export const flash = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.25), flashMa
 export const flashLight = new THREE.PointLight(0xffc070, 0, 12); flashLight.visible = true; camera.add(flashLight); flashLight.position.set(0.2, -0.1, -0.8);
 export function buildViewGuns() {
   const M = gunMats(gunMat), glove = lambert(0x2a2c30), cuff = lambert(0x1c1d20), jacket = lambert(0x3b4237); // Armel: dunkles Olivgruen
-  const VOFF = [[-0.03, 0.01, 0.0], [-0.05, 0.015, 0.2], [-0.06, 0.01, 0.3], [-0.06, 0.01, 0.3], [-0.04, 0.0, 0.35]]; // Waffe nach hinten/vorn verschieben, damit Schaft nicht in die Kamera ragt
+  const VOFF = [[-0.03, 0.01, 0.0], [-0.05, 0.015, 0.2], [-0.06, 0.01, 0.3], [-0.06, 0.01, 0.3], [-0.04, 0.03, 0.12]]; // Waffe nach hinten/vorn verschieben, damit Schaft nicht in die Kamera ragt
   WEAPONS.forEach((w, i) => {
     const g = new THREE.Group(), B = buildGunBody(i, M); g.add(B.group);
     const add = (grp, geo, m, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); grp.add(o); return o; };

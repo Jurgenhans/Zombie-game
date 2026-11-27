@@ -166,7 +166,7 @@ export function buildGunBody(i, M) {
     put(g, rbox(0.034, 0.09, 0.05, 0.012, M.grip), 0, -0.06, 0.04, -0.2);
     guard(g, M, 0, -0.035, 0.0, 0.06, 0.028);
     put(g, rbox(0.05, 0.07, 0.03, 0.008, M.rubber), 0, 0.0, 0.17);
-    muzzle = -0.78; rh = [0.018, -0.062, 0.04]; lh = [0.0, -0.14, -0.14]; lhMag = lh;
+    muzzle = -0.78; rh = [0.018, -0.062, 0.04]; lh = [0.0, -0.14, -0.14]; lhMag = lh; S = 2; // Minigun doppelt so groß
   } else { // ------- Schrotflinte (Pump Action)
     const pump = part('pump'), shells = part('shells');
     put(g, rbox(0.046, 0.078, 0.22, 0.01, M.steel), 0, 0.003, -0.1);                                                 // Gehaeuse
