@@ -46,3 +46,6 @@ Ab 10 m werden Zombies mit 50 % der Dreiecke gezeichnet, ab 20 m mit 10 % (`js/l
 
 ## Absperrgitter
 Vor etwa jedem dritten Eingang der begehbaren Häuser stehen Festival-Absperrgitter (3 Module à 2,2 m, `js/fences.js`, mit Kollision).
+
+## Respawns
+Alle 5 Wellen gibt es +1 Respawn (Welle 5 = 1, Welle 10 = 2 …). Bei Tod geht es mit vollen Leben am Start weiter (3 s unverwundbar).

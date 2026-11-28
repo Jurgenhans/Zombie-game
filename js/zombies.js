@@ -157,7 +157,8 @@ export const waves = {
     this.n++; this.active = true; this.spawnT = 1;
     const q = []; for (let i = 0; i < this.n * 10; i++) q.push(i);
     for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
-    this.queue = q; toast('WELLE ' + this.n + ' – ' + q.length + ' ZOMBIES'); if (this.onStart) this.onStart(this.n); updateHUD();
+    this.queue = q; if (this.n % 5 === 0) player.lives++; // alle 5 Wellen +1 Respawn
+    toast('WELLE ' + this.n + ' – ' + q.length + ' ZOMBIES' + (this.n % 5 === 0 ? ' · +1 RESPAWN' : '')); if (this.onStart) this.onStart(this.n); updateHUD();
   },
   update(dt) {
     if (!CONFIG.wavesEnabled || player.dead || S.won) return;
